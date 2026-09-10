@@ -212,23 +212,8 @@ async function handleChat(request, env, corsHeaders) {
         }
     }
 
-    // Fast path: music recommendation
-    const musicQuery = detectMusicQuery(message);
-    if (musicQuery) {
-        const musicReply = await fetchMusicRecommendation(musicQuery);
-        if (musicReply) {
-            return jsonResponse({ response: musicReply, type: 'music' }, 200, corsHeaders);
-        }
-    }
-
-    // Fast path: movie recommendation
-    const movieQuery = detectMovieQuery(message);
-    if (movieQuery) {
-        const movieReply = await fetchMovieRecommendation(movieQuery);
-        if (movieReply) {
-            return jsonResponse({ response: movieReply, type: 'movie' }, 200, corsHeaders);
-        }
-    }
+    // Note: Music & Movie recommendation pakai LLM (iTunes rate-limited from CF Workers edge HK)
+    // Cukup dengan LLM-generated recommendations, tetap useful dengan personality Dedek
 
     // Fast path: language teacher
     const langQuery = detectLanguageQuery(message);
@@ -261,8 +246,37 @@ async function handleChat(request, env, corsHeaders) {
     const nowJakarta = getJakartaTime();
     const timeContext = `[WAKTU SEKARANG] ${nowJakarta.full}\nHari: ${nowJakarta.weekday}\nZona waktu: Asia/Jakarta (WIB, UTC+7)`;
 
+    // Detect if user wants music/movie recommendation (let LLM handle with special instructions)
+    const musicQuery = detectMusicQuery(message);
+    const movieQuery = detectMovieQuery(message);
+
+    let extraContext = '';
+    if (musicQuery) {
+        extraContext = `\n\n[USER MINTA REKOMENDASI MUSIK] Mood/genre: "${musicQuery}"
+Kasih 3-5 rekomendasi lagu yang cocok dengan mood tersebut. Format:
+🎵 **Rekomendasi lagu buat ${musicQuery}:**
+
+1. **[Judul Lagu]** - [Artist]
+   Kenapa cocok: [alasan singkat, kenapa lagu ini match sama mood]
+2. ... (lanjut)
+
+Pakai lagu yang beneran ada (popular/known), hindari lagu yang kamu ragukan eksistensinya.`;
+    } else if (movieQuery) {
+        extraContext = `\n\n[USER MINTA REKOMENDASI FILM] Genre/mood: "${movieQuery}"
+Kasih 3-5 rekomendasi film yang cocok dengan genre/mood tersebut. Format:
+🎬 **Rekomendasi film untuk ${movieQuery}:**
+
+1. **[Judul Film]** ([Tahun])
+   🎭 Genre: [genre]
+   📝 [deskripsi singkat 1-2 kalimat]
+   🤍 Kenapa cocok: [alasan singkat kenapa match sama user]
+2. ... (lanjut)
+
+Pakai film yang beneran ada (popular/known), hindari film yang kamu ragukan eksistensinya.`;
+    }
+
     const messages = [
-        { role: 'system', content: systemPrompt + '\n\n' + timeContext },
+        { role: 'system', content: systemPrompt + '\n\n' + timeContext + extraContext },
     ];
 
     history.forEach(h => {
@@ -274,13 +288,14 @@ async function handleChat(request, env, corsHeaders) {
     try {
         const aiResponse = await env.AI.run(AI_MODEL, {
             messages,
-            max_tokens: 300,
+            max_tokens: musicQuery || movieQuery ? 600 : 300,  // More tokens for recommendations
             temperature: 0.7,
         });
 
         const reply = aiResponse.response || aiResponse.choices?.[0]?.message?.content || '(kosong)';
 
-        return jsonResponse({ response: reply }, 200, corsHeaders);
+        const type = musicQuery ? 'music' : movieQuery ? 'movie' : 'chat';
+        return jsonResponse({ response: reply, type }, 200, corsHeaders);
     } catch (error) {
         console.error('AI error:', error);
         return jsonResponse({
@@ -1002,40 +1017,54 @@ function detectMusicQuery(message) {
 
 async function fetchMusicRecommendation(query) {
     try {
-        // iTunes Search API (free, no key, returns song data)
+        // iTunes Search API (free, no key)
+        // Retry strategy: 3x with backoff if rate-limited
         const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=5&country=id`;
-        const resp = await fetch(url);
 
-        // iTunes sometimes rate-limits with text response (not JSON)
-        const contentType = resp.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-            console.log('iTunes music API returned non-JSON (rate limited?), falling through');
-            return null;  // Let LLM handle it
-        }
+        let lastError = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const resp = await fetch(url);
 
-        const data = await resp.json();
+                // iTunes rate-limits with non-JSON response sometimes
+                const contentType = resp.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    console.log(`iTunes attempt ${attempt + 1}: non-JSON response, retrying...`);
+                    await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+                    continue;
+                }
 
-        if (!data.results || data.results.length === 0) {
-            return null;  // Let LLM handle
-        }
+                const data = await resp.json();
 
-        const songs = data.results.slice(0, 5);
-        let reply = `🎵 Rekomendasi lagu buat "${query}":\n\n`;
+                if (!data.results || data.results.length === 0) {
+                    return null;
+                }
 
-        songs.forEach((song, i) => {
-            reply += `${i + 1}. **${song.trackName}** - ${song.artistName}\n`;
-            reply += `   📀 Album: ${song.collectionName || '-'}\n`;
-            if (song.previewUrl) {
-                reply += `   🎧 Preview: ${song.previewUrl}\n`;
+                const songs = data.results.slice(0, 5);
+                let reply = `🎵 Rekomendasi lagu buat "${query}":\n\n`;
+
+                songs.forEach((song, i) => {
+                    reply += `${i + 1}. **${song.trackName}** - ${song.artistName}\n`;
+                    reply += `   📀 Album: ${song.collectionName || '-'}\n`;
+                    if (song.previewUrl) {
+                        reply += `   🎧 Preview: ${song.previewUrl}\n`;
+                    }
+                    reply += `   🔗 ${song.trackViewUrl}\n\n`;
+                });
+
+                reply += `Semoga cocok sama mood kamu ya sayang 🤍`;
+                return reply;
+            } catch (err) {
+                lastError = err;
+                await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
             }
-            reply += `   🔗 ${song.trackViewUrl}\n\n`;
-        });
+        }
 
-        reply += `Semoga cocok sama mood kamu ya sayang 🤍`;
-        return reply;
+        console.log('All iTunes attempts failed:', lastError?.message);
+        return null;  // Let LLM handle
     } catch (error) {
         console.error('Music error:', error.message);
-        return null;  // Let LLM handle
+        return null;
     }
 }
 
