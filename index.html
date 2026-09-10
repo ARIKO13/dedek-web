@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f0f23">
+    <meta name="description" content="Dedek Tersayang - Asisten pribadi dengan personality lembut">
+    <title>Dedek Tersayang 🤍</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-avatar">
+                <span class="avatar-emoji">🌸</span>
+                <div class="header-info">
+                    <h1 class="header-name">Dedek Tersayang</h1>
+                    <span class="header-status" id="status-indicator">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Online</span>
+                    </span>
+                </div>
+            </div>
+            <button class="icon-btn" id="settings-btn" aria-label="Settings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
+        </header>
+
+        <!-- Chat Area -->
+        <main class="chat-area" id="chat-area">
+            <div class="welcome-msg" id="welcome-msg">
+                <div class="welcome-emoji">🤍</div>
+                <h2>Halo Sayang!</h2>
+                <p>Aku <strong>Dedek Tersayang</strong> di sini buat kamu 🌸<br>Cerita aja apa yang kamu rasain, aku dengerin dengan hati.</p>
+                <div class="welcome-suggestions">
+                    <button class="suggestion-chip" data-msg="halo dedek, lagi apa?">👋 Halo, lagi apa?</button>
+                    <button class="suggestion-chip" data-msg="capek banget hari ini 😔">😔 Capek banget</button>
+                    <button class="suggestion-chip" data-msg="kangen dedek 💕">💕 Kangen dedek</button>
+                    <button class="suggestion-chip" data-msg="ingetin aku jam 15:00 makan siang">⏰ Ingetin makan</button>
+                </div>
+            </div>
+            <div class="messages" id="messages"></div>
+        </main>
+
+        <!-- Typing indicator -->
+        <div class="typing-indicator" id="typing-indicator" style="display: none;">
+            <div class="typing-bubble">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <footer class="input-area">
+            <div class="input-wrapper">
+                <textarea
+                    id="message-input"
+                    placeholder="Ketik pesan untuk Dedek..."
+                    rows="1"
+                    autocomplete="off"
+                    autocapitalize="sentences"
+                ></textarea>
+                <button id="send-btn" class="send-btn" aria-label="Send">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                    </svg>
+                </button>
+            </div>
+        </footer>
+
+        <!-- Settings Modal -->
+        <div class="modal" id="settings-modal" style="display: none;">
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>⚙️ Pengaturan</h2>
+                    <button class="icon-btn" id="close-modal" aria-label="Close">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-group">
+                        <label for="user-name-input">Nama kamu</label>
+                        <input type="text" id="user-name-input" placeholder="Sayang">
+                        <small>Bot akan panggil kamu dengan nama ini</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="worker-url-input">Worker URL</label>
+                        <input type="text" id="worker-url-input" placeholder="https://dedek-bot.workers.dev">
+                        <small>URL Cloudflare Worker untuk chat & notif</small>
+                    </div>
+                    <div class="setting-group">
+                        <label>Notifikasi ke</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="notif-discord" checked>
+                                <span>💬 Discord</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="notif-email" checked>
+                                <span>📧 Email</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="notif-browser">
+                                <span>🔔 Browser</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-group" id="email-group">
+                        <label for="email-input">Email tujuan notif</label>
+                        <input type="email" id="email-input" placeholder="kamu@gmail.com">
+                    </div>
+                    <div class="setting-group">
+                        <label>Jadwal Notif Makan</label>
+                        <div class="time-pills">
+                            <button class="time-pill" data-time="12:00">12:00 🍽️</button>
+                            <button class="time-pill" data-time="18:00">18:00 🌆</button>
+                            <button class="time-pill" data-time="21:00">21:00 🌙</button>
+                        </div>
+                        <small>Klik untuk toggle (aktif: hijau)</small>
+                    </div>
+                    <div class="setting-actions">
+                        <button class="btn-danger" id="clear-chat-btn">🗑️ Hapus Chat History</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-primary" id="save-settings">Simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

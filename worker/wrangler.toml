@@ -1,0 +1,43 @@
+name = "dedek-tersayang-bot"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# Workers AI binding (free 10k neurons/day)
+[ai]
+binding = "AI"
+
+# Cron Triggers - run every minute to check reminders
+[triggers]
+crons = ["* * * * *"]
+
+# Environment variables (non-sensitive, set in dashboard)
+[vars]
+# Sensitive vars must be set via `wrangler secret put`:
+#   - CLOUDFLARE_API_TOKEN
+#   - DISCORD_WEBHOOK_URL
+#   - RESEND_API_KEY
+#   - RESEND_FROM
+#   - RESEND_TO
+
+# Optional: enable logs
+[observability]
+enabled = true
+
+# ============ Deploy Instructions ============
+#
+# 1. Install wrangler CLI:
+#    npm install -g wrangler
+#
+# 2. Login to Cloudflare:
+#    wrangler login
+#
+# 3. Set secrets (one-time setup):
+#    wrangler secret put DISCORD_WEBHOOK_URL
+#    wrangler secret put RESEND_API_KEY
+#    wrangler secret put RESEND_TO   # your email
+#
+# 4. Deploy:
+#    wrangler deploy
+#
+# 5. Get the Worker URL (https://dedek-tersayang-bot.<your-subdomain>.workers.dev)
+#    - Set this URL in the web app's settings
