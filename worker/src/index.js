@@ -112,7 +112,9 @@ export default {
             }
 
             if (path === '/weather' && method === 'GET') {
-                return await handleWeather(url, corsHeaders);
+                const location = url.searchParams.get('location') || 'Jakarta';
+                const weatherReply = await fetchWeather(location);
+                return jsonResponse({ response: weatherReply, type: 'weather' }, 200, corsHeaders);
             }
 
             if (path === '/calc' && method === 'POST') {
@@ -187,6 +189,51 @@ async function handleChat(request, env, corsHeaders) {
         const translateReply = await handleTranslation(translateQuery, env, userName);
         if (translateReply) {
             return jsonResponse({ response: translateReply, type: 'translate' }, 200, corsHeaders);
+        }
+    }
+
+    // Fast path: music recommendation
+    const musicQuery = detectMusicQuery(message);
+    if (musicQuery) {
+        const musicReply = await fetchMusicRecommendation(musicQuery);
+        if (musicReply) {
+            return jsonResponse({ response: musicReply, type: 'music' }, 200, corsHeaders);
+        }
+    }
+
+    // Fast path: movie recommendation
+    const movieQuery = detectMovieQuery(message);
+    if (movieQuery) {
+        const movieReply = await fetchMovieRecommendation(movieQuery);
+        if (movieReply) {
+            return jsonResponse({ response: movieReply, type: 'movie' }, 200, corsHeaders);
+        }
+    }
+
+    // Fast path: language teacher
+    const langQuery = detectLanguageQuery(message);
+    if (langQuery) {
+        const langReply = await handleLanguageTeaching(langQuery, env, userName);
+        if (langReply) {
+            return jsonResponse({ response: langReply, type: 'language_teacher' }, 200, corsHeaders);
+        }
+    }
+
+    // Fast path: creative writer (story/poem)
+    const creativeQuery = detectCreativeQuery(message);
+    if (creativeQuery) {
+        const creativeReply = await handleCreativeWriting(creativeQuery, env, userName);
+        if (creativeReply) {
+            return jsonResponse({ response: creativeReply, type: 'creative' }, 200, corsHeaders);
+        }
+    }
+
+    // Fast path: daily planner
+    const plannerQuery = detectPlannerQuery(message);
+    if (plannerQuery) {
+        const plannerReply = await handleDailyPlanner(plannerQuery, env, userName);
+        if (plannerReply) {
+            return jsonResponse({ response: plannerReply, type: 'planner' }, 200, corsHeaders);
         }
     }
 
@@ -895,6 +942,444 @@ async function handleTranslate(request, env, corsHeaders) {
 
     const result = await handleTranslation({ text, target_lang }, env, user_name || 'Sayang');
     return jsonResponse({ response: result, type: 'translate' }, 200, corsHeaders);
+}
+
+// ============ Music Recommendation (iTunes Search API - free, no key) ============
+function detectMusicQuery(message) {
+    const lower = message.toLowerCase().trim();
+
+    // Pattern: "rekomendasi lagu [genre/mood]", "musik [genre/mood]", "lagu buat [mood]"
+    const patterns = [
+        /(?:rekomendasi|rekomen|suggest)\s+(?:lagu|musik|music|song|playlist)\s+(?:buat|untuk|tentang|theme)?\s*([a-zA-Z\s,]+?)$/i,
+        /(?:lagu|musik|music|song|playlist)\s+(?:buat|untuk|for|tema|theme)\s+([a-zA-Z\s,]+?)$/i,
+        /(?:putarin|putarkan|mainin)\s+(?:lagu|musik)\s+(?:buat|untuk|yang)?\s*([a-zA-Z\s,]+?)$/i,
+        /(?:cari|carikan)\s+(?:lagu|musik)\s+(?:buat|untuk|yang)?\s*([a-zA-Z\s,]+?)$/i,
+        /(?:rekomendasi|rekomen|suggest)\s+(?:lagu|musik|music|song)$/i, // bare "rekomendasi lagu"
+    ];
+
+    for (const p of patterns) {
+        const m = lower.match(p);
+        if (m) {
+            const mood = (m[1] || 'pop').trim().replace(/[?!.,]$/, '');
+            if (mood.length >= 1 && mood.length < 50) {
+                return mood;
+            }
+        }
+    }
+
+    // Single keyword: "musik", "lagi lagu", "music"
+    if (/^(?:lagu|musik|music|song|playlist)\s*$/i.test(lower)) {
+        return 'pop';
+    }
+
+    // "rekomendasi lagu" alone (no mood specified)
+    if (/(?:rekomendasi|rekomen)\s+(?:lagu|musik)/i.test(lower) && lower.length < 30) {
+        return 'pop';
+    }
+
+    return null;
+}
+
+async function fetchMusicRecommendation(query) {
+    try {
+        // iTunes Search API (free, no key, returns song data)
+        const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=5&country=id`;
+        const resp = await fetch(url);
+
+        // iTunes sometimes rate-limits with text response (not JSON)
+        const contentType = resp.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            console.log('iTunes music API returned non-JSON (rate limited?), falling through');
+            return null;  // Let LLM handle it
+        }
+
+        const data = await resp.json();
+
+        if (!data.results || data.results.length === 0) {
+            return null;  // Let LLM handle
+        }
+
+        const songs = data.results.slice(0, 5);
+        let reply = `🎵 Rekomendasi lagu buat "${query}":\n\n`;
+
+        songs.forEach((song, i) => {
+            reply += `${i + 1}. **${song.trackName}** - ${song.artistName}\n`;
+            reply += `   📀 Album: ${song.collectionName || '-'}\n`;
+            if (song.previewUrl) {
+                reply += `   🎧 Preview: ${song.previewUrl}\n`;
+            }
+            reply += `   🔗 ${song.trackViewUrl}\n\n`;
+        });
+
+        reply += `Semoga cocok sama mood kamu ya sayang 🤍`;
+        return reply;
+    } catch (error) {
+        console.error('Music error:', error.message);
+        return null;  // Let LLM handle
+    }
+}
+
+// ============ Movie Recommendation (iTunes movie search - free, no key) ============
+function detectMovieQuery(message) {
+    const lower = message.toLowerCase().trim();
+
+    // Pattern: "rekomendasi film [genre/mood]", "film [genre]"
+    const patterns = [
+        /(?:rekomendasi|rekomen|suggest)\s+(?:film|movie|fmovie)\s+(?:buat|untuk|tentang)?\s*([a-zA-Z\s,]+?)$/i,
+        /(?:film|movie)\s+(?:buat|untuk|for|tema|theme)\s+([a-zA-Z\s,]+?)$/i,
+        /(?:cari|carikan)\s+(?:film|movie)\s+(?:buat|untuk|yang)?\s*([a-zA-Z\s,]+?)$/i,
+        /(?:tontonin|tonton|nonton)\s+(?:film|movie)?\s*(?:buat|untuk|yang)?\s*([a-zA-Z\s,]+?)$/i,
+        /(?:rekomendasi|rekomen|suggest)\s+(?:film|movie)$/i,
+    ];
+
+    for (const p of patterns) {
+        const m = lower.match(p);
+        if (m) {
+            const mood = (m[1] || 'popular').trim().replace(/[?!.,]$/, '');
+            if (mood.length >= 1 && mood.length < 50) {
+                return mood;
+            }
+        }
+    }
+
+    // Single keyword: "film", "movie", "nonton"
+    if (/^(?:film|movie|nonton)\s*$/i.test(lower)) {
+        return 'popular';
+    }
+
+    // "rekomendasi film" alone (no genre)
+    if (/(?:rekomendasi|rekomen)\s+(?:film|movie)/i.test(lower) && lower.length < 30) {
+        return 'popular';
+    }
+
+    return null;
+}
+
+async function fetchMovieRecommendation(query) {
+    try {
+        // iTunes movie search - use country=us because id has no movies
+        // Note: iTunes has rate limit from CF Workers, handle gracefully
+        const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=movie&limit=5&country=us`;
+        const resp = await fetch(url);
+
+        // Check if response is JSON (iTunes sometimes rate-limits with text response)
+        const contentType = resp.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            console.log('iTunes movie API returned non-JSON (rate limited?), falling through');
+            return null;  // Let LLM handle it
+        }
+
+        const data = await resp.json();
+
+        if (!data.results || data.results.length === 0) {
+            return null;  // Let LLM handle recommendation
+        }
+
+        const movies = data.results.slice(0, 5);
+        let reply = `🎬 Rekomendasi film untuk "${query}":\n\n`;
+
+        movies.forEach((movie, i) => {
+            reply += `${i + 1}. **${movie.trackName || movie.collectionName}** (${movie.releaseDate ? movie.releaseDate.substring(0, 4) : '-'})\n`;
+            reply += `   🎭 Genre: ${movie.primaryGenreName || '-'}\n`;
+            if (movie.longDescription) {
+                reply += `   📝 ${movie.longDescription.substring(0, 150)}...\n`;
+            }
+            if (movie.previewUrl) {
+                reply += `   🎬 Trailer: ${movie.previewUrl}\n`;
+            }
+            reply += `   🔗 ${movie.trackViewUrl}\n\n`;
+        });
+
+        reply += `Selamat nonton ya sayang 🍿🤍`;
+        return reply;
+    } catch (error) {
+        console.error('Movie error:', error.message);
+        return null;  // Let LLM handle it gracefully
+    }
+}
+
+// ============ Language Teacher ============
+function detectLanguageQuery(message) {
+    const lower = message.toLowerCase().trim();
+
+    // Pattern: "belajar bahasa X", "ajari aku bahasa X", "gimana bilang Y dalam bahasa Z"
+    const patterns = [
+        /(?:belajar|pelajari|ajar(?:in|kan)?)\s+(?:aku\s+)?bahasa\s+(\w+(?:\s+\w+)?)/i,
+        /(?:belajar|pelajari)\s+(?:bahasa\s+)?(inggris|english|jepang|japanese|korea|korean|cina|chinese|mandarin|sunda|jawa|perancis|french|jerman|german|spanyol|spanish|arab|arabic|thai|rusia|russian|italia|italian|belanda|dutch)/i,
+        /(?:gimana|gmana|bagaimana)\s+(?:bilang|ngomong|bilangnya)\s+[""']?(.+?)[""']?\s+(?:di|dalam|dgn|dengan)\s+bahasa\s+(\w+(?:\s+\w+)?)/i,
+        /(?:sebutin|bilang)\s+[""']?(.+?)[""']?\s+(?:di|dalam|dgn|dengan)\s+bahasa\s+(\w+(?:\s+\w+)?)/i,
+    ];
+
+    for (const p of patterns) {
+        const m = lower.match(p);
+        if (m) {
+            // For pattern 1 & 2: just learning the language
+            if (m.length === 2 && m[1]) {
+                return {
+                    type: 'learn',
+                    language: m[1].trim(),
+                    text: null,
+                };
+            }
+            // For pattern 3 & 4: translate specific phrase and explain
+            if (m.length === 3 && m[1] && m[2]) {
+                return {
+                    type: 'phrase',
+                    language: m[2].trim(),
+                    text: m[1].trim().replace(/[""']/g, ''),
+                };
+            }
+        }
+    }
+
+    return null;
+}
+
+async function handleLanguageTeaching(query, env, userName) {
+    const langMap = {
+        'inggris': 'English', 'english': 'English', 'en': 'English',
+        'jepang': 'Japanese', 'japanese': 'Japanese', 'jp': 'Japanese',
+        'korea': 'Korean', 'korean': 'Korean', 'kr': 'Korean',
+        'cina': 'Chinese (Mandarin)', 'chinese': 'Chinese (Mandarin)', 'mandarin': 'Chinese (Mandarin)', 'zh': 'Chinese (Mandarin)',
+        'sunda': 'Sundanese', 'jawa': 'Javanese', 'javanese': 'Javanese',
+        'perancis': 'French', 'french': 'French', 'fr': 'French',
+        'jerman': 'German', 'german': 'German', 'de': 'German',
+        'spanyol': 'Spanish', 'spanish': 'Spanish', 'es': 'Spanish',
+        'arab': 'Arabic', 'arabic': 'Arabic', 'ar': 'Arabic',
+        'thai': 'Thai', 'rusia': 'Russian', 'russian': 'Russian',
+        'italia': 'Italian', 'italian': 'Italian',
+        'belanda': 'Dutch', 'dutch': 'Dutch',
+    };
+
+    const targetLang = langMap[query.language.toLowerCase()] || query.language;
+
+    let prompt;
+    if (query.type === 'phrase' && query.text) {
+        // Translate specific phrase + explain pronunciation + context
+        prompt = `User mau belajar bahasa ${targetLang}. Dia nanya gimana bilang "${query.text}" dalam bahasa ${targetLang}.
+
+Kasih jawaban dengan format:
+1. **Terjemahan**: [hasil terjemahan, tone natural sesuai konteks]
+2. **Cara baca**: [pengucapan untuk non-native, pakai ejaan latin atau romanisasi]
+3. **Konteks**: [kapan dipakai - formal/santai/ke temen/ke orang tua]
+4. **Contoh lain**: [1-2 variasi kalimat dengan tone beda]
+
+Pakai personality lembut (Dedek Tersayang), panggil user "Sayang", pakai emoji secukupnya.`;
+    } else {
+        // General language learning - teach basic phrases
+        prompt = `User mau belajar bahasa ${targetLang}. Kasih dia pengenalan singkat dengan format:
+
+📚 **Belajar Bahasa ${targetLang}** 🌍
+
+Berikut 5 frasa dasar yang sering dipakai sehari-hari:
+
+1. **Halo** → [terjemahan] (cara baca: [...])
+2. **Terima kasih** → [terjemahan] (cara baca: [...])
+3. **Apa kabar?** → [terjemahan] (cara baca: [...])
+4. **Nama kamu siapa?** → [terjemahan] (cara baca: [...])
+5. **Sampai jumpa** → [terjemahan] (cara baca: [...])
+
+Tambahin 1 tips belajar bahasa ${targetLang} di akhir.
+
+Pakai personality lembut (Dedek Tersayang), panggil user "Sayang", pakai emoji secukupnya.`;
+    }
+
+    const messages = [
+        {
+            role: 'system',
+            content: 'Kamu guru bahasa yang sabar dan lembut. Jelaskan dengan cara yang mudah dipahami, kasih pengucapan (romanisasi), dan konteks penggunaan. Selalu pakai personality Dedek Tersayang - lembut, perhatian, pakai "Sayang".',
+        },
+        { role: 'user', content: prompt },
+    ];
+
+    try {
+        const aiResponse = await env.AI.run(AI_MODEL, {
+            messages,
+            max_tokens: 500,
+            temperature: 0.6,
+        });
+        const reply = aiResponse.response || aiResponse.choices?.[0]?.message?.content || '';
+        return reply.trim() || null;
+    } catch (error) {
+        console.error('Language teacher error:', error);
+        return null;
+    }
+}
+
+// ============ Creative Writer (Story/Poem) ============
+function detectCreativeQuery(message) {
+    const lower = message.toLowerCase().trim();
+
+    // Pattern: "bikin puisi tentang X", "tulis cerita tentang Y"
+    const poemPatterns = [
+        /(?:bikin|buat|tulis|bikinin|buatin|tulisin)\s+(?:puisi|sajak|gypho)\s+(?:tentang|soal|buat)?\s*([a-zA-Z\s,]+?)$/i,
+        /(?:bikin|buat|tulis).+puisi\s+(?:tentang|soal|buat)?\s*([a-zA-Z\s,]+?)$/i,
+        /puisi\s+(?:tentang|soal|buat)\s+([a-zA-Z\s,]+?)$/i,
+    ];
+
+    const storyPatterns = [
+        /(?:bikin|buat|tulis|bikinin|buatin|tulisin|ceritain)\s+(?:cerita|story|cerpen)\s+(?:tentang|soal|buat)?\s*([a-zA-Z\s,]+?)$/i,
+        /(?:bikin|buat|tulis).+cerita\s+(?:tentang|soal|buat)?\s*([a-zA-Z\s,]+?)$/i,
+        /cerita(?:n)?\s+(?:tentang|soal|buat)\s+([a-zA-Z\s,]+?)$/i,
+    ];
+
+    const loveLetterPatterns = [
+        /(?:bikin|buat|tulis|bikinin|buatin|tulisin)\s+(?:surat\s+cinta|love\s+letter)\s*(?:buat|untuk)?\s*([a-zA-Z\s,]+?)$/i,
+        /surat\s+cinta\s+(?:buat|untuk)\s+([a-zA-Z\s,]+?)$/i,
+    ];
+
+    for (const p of poemPatterns) {
+        const m = lower.match(p);
+        if (m && m[1]) {
+            return { type: 'poem', topic: m[1].trim().replace(/[?!.,]$/, '') };
+        }
+    }
+
+    for (const p of storyPatterns) {
+        const m = lower.match(p);
+        if (m && m[1]) {
+            return { type: 'story', topic: m[1].trim().replace(/[?!.,]$/, '') };
+        }
+    }
+
+    for (const p of loveLetterPatterns) {
+        const m = lower.match(p);
+        if (m && m[1]) {
+            return { type: 'love_letter', topic: m[1].trim().replace(/[?!.,]$/, '') };
+        }
+    }
+
+    return null;
+}
+
+async function handleCreativeWriting(query, env, userName) {
+    let prompt;
+    let systemContent;
+
+    if (query.type === 'poem') {
+        systemContent = 'Kamu penulis puisi yang romantis dan puitis. Tulis puisi yang indah, penuh emosi, dengan diksi yang lembut. Pakai personality Dedek Tersayang - lembut, romantis, panggil user "Sayang".';
+        prompt = `Tulis puisi pendek (4-6 baris) tentang: "${query.topic}".
+
+Syarat:
+- Puitis dan indah
+- Bisa romantis kalau cocok
+- Pakai bahasa Indonesia yang elegan
+- Jangan terlalu panjang
+- Boleh kasih emoji lembut di akhir (1-2)`;
+    } else if (query.type === 'story') {
+        systemContent = 'Kamu penulis cerita yang kreatif. Bikin cerita pendek yang menarik, dengan twist atau ending yang manis. Pakai personality Dedek Tersayang - lembut, hangat, panggil user "Sayang".';
+        prompt = `Bikin cerita pendek (3-5 paragraf) tentang: "${query.topic}".
+
+Syarat:
+- Menarik dan ringkas
+- Punya twist atau ending yang manis
+- Bahasa Indonesia natural
+- Bisa romantis kalau cocok`;
+    } else if (query.type === 'love_letter') {
+        systemContent = 'Kamu penulis surat cinta yang romantis dan tulus. Tulis dengan emosi mendalam tapi gak berlebihan. Pakai personality Dedek Tersayang - romantis, lembut, panggil user "Sayang".';
+        prompt = `Tulis surat cinta pendek (3-4 paragraf) untuk: "${query.topic}".
+
+Syarat:
+- Tulus dan personal
+- Bahasa Indonesia natural (bukan kaku)
+- Hindari kalimat klise seperti "kamu adalah matahariku"
+- Boleh sedikit playful`;
+    }
+
+    const messages = [
+        { role: 'system', content: systemContent },
+        { role: 'user', content: prompt },
+    ];
+
+    try {
+        const aiResponse = await env.AI.run(AI_MODEL, {
+            messages,
+            max_tokens: 600,
+            temperature: 0.85,  // Higher creativity for writing
+        });
+        const reply = aiResponse.response || aiResponse.choices?.[0]?.message?.content || '';
+        return reply.trim() || null;
+    } catch (error) {
+        console.error('Creative writing error:', error);
+        return null;
+    }
+}
+
+// ============ Daily Planner ============
+function detectPlannerQuery(message) {
+    const lower = message.toLowerCase().trim();
+
+    // Pattern: "bantu rencana hari ini", "buat jadwal untuk hari ini"
+    const patterns = [
+        /(?:bantu|bikin|buat|atur)\s+(?:aku\s+)?(?:rencana|jadwal|schedule|plan)\s+(.+)/i,
+        /(?:rencana|jadwal)\s+(?:buat|untuk)\s+(.+)/i,
+        /(?:gimana|gmana|bagaimana)\s+(?:atur|bikin)\s+(?:jadwal|rencana)\s+(?:buat|untuk)?\s*(.+)/i,
+        /(?: aku\s+)?(?:mau\s+)?(?:rencana|jadwal)\s+(.+)/i,
+    ];
+
+    for (const p of patterns) {
+        const m = lower.match(p);
+        if (m && m[1]) {
+            const activity = m[1].trim().replace(/[?!.,]$/, '');
+            if (activity.length > 1 && activity.length < 200) {
+                return { activity };
+            }
+        }
+    }
+
+    return null;
+}
+
+async function handleDailyPlanner(query, env, userName) {
+    const nowJakarta = getJakartaTime();
+
+    const prompt = `User: "${userName}" minta bantu bikin jadwal/rencana untuk: "${query.activity}".
+
+Waktu sekarang: ${nowJakarta.full}
+
+Bikin jadwal yang realistis dan terorganisir untuk aktivitas tersebut. Format:
+
+📅 **Rencana untuk: ${query.activity}**
+
+🌅 Pagi (xx:xx - xx:xx):
+• [Aktivitas 1]
+• [Aktivitas 2]
+
+🌤️ Siang (xx:xx - xx:xx):
+• [Aktivitas 3]
+• [Aktivitas 4]
+
+🌆 Sore (xx:xx - xx:xx):
+• [Aktivitas 5]
+
+🌙 Malam (xx:xx - xx:xx):
+• [Aktivitas 6]
+• Waktu istirahat/relax
+
+💡 Tips: [1 tips singkat biar produktif]
+
+Pakai personality Dedek Tersayang - lembut, perhatian, panggil "Sayang", pakai emoji secukupnya.`;
+
+    const messages = [
+        {
+            role: 'system',
+            content: 'Kamu asisten personal yang bantu bikin jadwal realistis dan terorganisir. Pertimbangkan waktu mulai dari jam sekarang, jangan over-schedule, sisipkan waktu istirahat. Pakai personality Dedek Tersayang.',
+        },
+        { role: 'user', content: prompt },
+    ];
+
+    try {
+        const aiResponse = await env.AI.run(AI_MODEL, {
+            messages,
+            max_tokens: 500,
+            temperature: 0.6,
+        });
+        const reply = aiResponse.response || aiResponse.choices?.[0]?.message?.content || '';
+        return reply.trim() || null;
+    } catch (error) {
+        console.error('Planner error:', error);
+        return null;
+    }
 }
 
 // ============ Reminder Handler ============
