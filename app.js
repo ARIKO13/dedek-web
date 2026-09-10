@@ -480,7 +480,14 @@ async function sendMessage(text) {
     showTyping();
 
     try {
-        // Check if it's a reminder request
+        // Check if it's a note command (auto-route to Notes page)
+        const noteContent = detectNoteCommand(text);
+        if (noteContent) {
+            await handleNoteFromChat(noteContent);
+            return;
+        }
+
+        // Check if it's a reminder request (auto-route to Schedule page)
         const reminderMatch = parseReminder(text);
         if (reminderMatch) {
             await handleReminder(reminderMatch);
@@ -602,8 +609,28 @@ function parseReminder(text) {
 }
 
 async function handleReminder(reminder) {
+    // Save to local Schedule page (localStorage)
+    const localReminder = {
+        id: Date.now() + Math.random(),
+        title: reminder.task,
+        description: '',
+        datetime: reminder.time.toISOString(),
+        repeat: 'none',
+        notify: {
+            local: true,
+            discord: settings.notifDiscord,
+            email: settings.notifEmail && !!settings.email,
+        },
+        createdAt: Date.now(),
+        fromChat: true,
+    };
+    reminders.push(localReminder);
+    saveReminders();
+    renderNavBadges();
+    scheduleLocalReminders();
+
     try {
-        // Save reminder to Worker
+        // Save reminder to Worker (for Discord/email notif)
         const response = await fetch(`${settings.workerUrl}/reminders`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -625,7 +652,7 @@ async function handleReminder(reminder) {
         const timeStr = reminder.time.toLocaleString('id-ID', {
             day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
         });
-        const replyText = `✅ Siap sayang! Aku ingetin kamu untuk **${reminder.task}** pada ${timeStr} ya 🌸`;
+        const replyText = `✅ Siap sayang! Aku ingetin kamu untuk **${reminder.task}** pada ${timeStr} ya 🌸\n\n📅 Udah aku simpan ke halaman Jadwal juga, bisa kamu cek di sidebar 🤍`;
 
         const botMsg = { text: replyText, role: 'bot', timestamp: Date.now() };
         messages.push(botMsg);
@@ -633,15 +660,89 @@ async function handleReminder(reminder) {
         saveMessages();
     } catch (error) {
         hideTyping();
-        // Even if Worker fails, save locally for browser notification
-        scheduleBrowserReminder(reminder);
-        const replyText = `✅ Aku catet ya sayang! Tapi Worker belum setup, jadi cuma bisa ingetin via browser kalau web ini kebuka 🌸\nReminder: **${reminder.task}** pada ${reminder.time.toLocaleString('id-ID')}`;
+        // Even if Worker fails, reminder udah tersimpan di local Schedule page
+        const timeStr = reminder.time.toLocaleString('id-ID', {
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+        });
+        const replyText = `✅ Aku catet ya sayang! **${reminder.task}** pada ${timeStr} 🌸\n\n📅 Udah masuk ke halaman Jadwal. Notif Discord/email belum jalan (Worker belum setup), tapi browser notif bakal muncul kalau web ini kebuka 🤍`;
 
         const botMsg = { text: replyText, role: 'bot', timestamp: Date.now() };
         messages.push(botMsg);
         addMessageToDOM(replyText, 'bot', botMsg.timestamp);
         saveMessages();
     }
+}
+
+// ============ Auto-route Notes from Chat ============
+function detectNoteCommand(message) {
+    const lower = message.toLowerCase().trim();
+
+    // Patterns: "catat X", "catet X", "catatan: X", "ingetin catat X", "simpan catatan X"
+    const patterns = [
+        /^(?:catat|catet|catatan)\s*[:\-]?\s*(.+)$/i,
+        /^(?:simpan\s+catatan|catatan\s+buat)\s+(.+)$/i,
+        /^(?:inget\s+catat|ingetin\s+catat)\s+(.+)$/i,
+        /^#catatan\s+(.+)$/i,
+        /^note\s*[:\-]?\s*(.+)$/i,
+    ];
+
+    for (const p of patterns) {
+        const m = message.match(p);
+        if (m && m[1]) {
+            const content = m[1].trim();
+            if (content.length > 0 && content.length < 1000) {
+                return content;
+            }
+        }
+    }
+
+    return null;
+}
+
+function addNoteFromChat(content) {
+    // Cek apakah ada title (sebelum ":") dan body (setelah ":")
+    let title = 'Catatan dari chat';
+    let body = content;
+
+    const colonIdx = content.indexOf(':');
+    if (colonIdx > 0 && colonIdx < 50) {
+        title = content.substring(0, colonIdx).trim();
+        body = content.substring(colonIdx + 1).trim();
+    } else {
+        // Auto-generate title dari first 30 chars
+        title = content.length > 30 ? content.substring(0, 30) + '...' : content;
+    }
+
+    const note = {
+        id: Date.now() + Math.random(),
+        title,
+        body,
+        timestamp: Date.now(),
+        fromChat: true,
+    };
+
+    notes.unshift(note);
+    saveNotes();
+    renderNavBadges();
+
+    return note;
+}
+
+async function handleNoteFromChat(content) {
+    hideTyping();
+
+    // Save note locally
+    const note = addNoteFromChat(content);
+
+    // Try sync to Worker (Google Keep if configured) - optional
+    // For now, just save locally
+
+    const replyText = `📝 Udah aku catat ke halaman Catatan ya sayang 🌸\n\n**${note.title}**\n${note.body}\n\nCek di sidebar → 📝 Catatan 🤍`;
+
+    const botMsg = { text: replyText, role: 'bot', timestamp: Date.now() };
+    messages.push(botMsg);
+    addMessageToDOM(replyText, 'bot', botMsg.timestamp);
+    saveMessages();
 }
 
 function scheduleBrowserReminder(reminder) {
