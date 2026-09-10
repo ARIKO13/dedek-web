@@ -14,7 +14,10 @@
         <!-- Header -->
         <header class="header">
             <div class="header-avatar">
-                <span class="avatar-emoji">🌸</span>
+                <div class="avatar-wrapper" id="avatar-wrapper">
+                    <span class="avatar-emoji" id="avatar-emoji">🌸</span>
+                    <img class="avatar-photo" id="avatar-photo" alt="" style="display:none">
+                </div>
                 <div class="header-info">
                     <h1 class="header-name">Dedek Tersayang</h1>
                     <span class="header-status" id="status-indicator">
@@ -81,6 +84,22 @@
                     <button class="icon-btn" id="close-modal" aria-label="Close">✕</button>
                 </div>
                 <div class="modal-body">
+                    <div class="setting-group">
+                        <label>Foto Profil Asisten</label>
+                        <div class="photo-upload-wrapper">
+                            <div class="photo-preview" id="photo-preview">
+                                <span class="photo-preview-emoji">🌸</span>
+                            </div>
+                            <div class="photo-actions">
+                                <input type="file" id="photo-file" accept="image/*" style="display:none">
+                                <button class="btn-secondary" id="upload-photo-btn">📁 Upload Foto</button>
+                                <button class="btn-secondary" id="use-url-btn">🔗 Pakai URL</button>
+                                <button class="btn-danger-small" id="remove-photo-btn">🗑️ Reset ke 🌸</button>
+                            </div>
+                            <input type="text" id="photo-url-input" placeholder="https://..." style="display:none; margin-top:8px;">
+                            <small>Pakai foto sendiri biar asisten terasa lebih personal 🤍</small>
+                        </div>
+                    </div>
                     <div class="setting-group">
                         <label for="user-name-input">Nama kamu</label>
                         <input type="text" id="user-name-input" placeholder="Sayang">

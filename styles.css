@@ -77,10 +77,31 @@ html, body {
     gap: 12px;
 }
 
+.avatar-wrapper {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #e91e63 0%, #ad1457 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 0 12px rgba(233, 30, 99, 0.4);
+    flex-shrink: 0;
+}
+
 .avatar-emoji {
-    font-size: 32px;
+    font-size: 24px;
     line-height: 1;
-    filter: drop-shadow(0 0 8px rgba(233, 30, 99, 0.3));
+    filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.3));
+}
+
+.avatar-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
 }
 
 .header-info {
@@ -547,6 +568,82 @@ html, body {
     margin-top: 24px;
     padding-top: 20px;
     border-top: 1px solid var(--border);
+}
+
+/* ============ Photo Upload ============ */
+.photo-upload-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.photo-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #e91e63 0%, #ad1457 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(233, 30, 99, 0.4);
+    border: 3px solid var(--accent);
+}
+
+.photo-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.photo-preview-emoji {
+    font-size: 40px;
+    line-height: 1;
+    filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.3));
+}
+
+.photo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+}
+
+.btn-secondary {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.btn-danger-small {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.btn-danger-small:hover {
+    background: var(--danger);
+    color: white;
 }
 
 /* ============ Scrollbar ============ */

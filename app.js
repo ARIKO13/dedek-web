@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
     notifBrowser: false,
     email: '',
     mealTimes: ['12:00', '18:00', '21:00'],
+    photoUrl: '',  // URL foto profil (atau base64 data URL dari upload)
 };
 
 // State
@@ -41,8 +42,42 @@ function init() {
     loadSettings();
     loadMessages();
     renderMessages();
+    renderAvatar();
     setupEventListeners();
     setupServiceWorker();
+}
+
+// ============ Avatar / Photo ============
+function renderAvatar() {
+    const emoji = document.getElementById('avatar-emoji');
+    const photo = document.getElementById('avatar-photo');
+
+    if (settings.photoUrl) {
+        photo.src = settings.photoUrl;
+        photo.style.display = 'block';
+        emoji.style.display = 'none';
+    } else {
+        photo.style.display = 'none';
+        photo.src = '';
+        emoji.style.display = 'block';
+        emoji.textContent = '🌸';
+    }
+}
+
+function renderPhotoPreview() {
+    const preview = document.getElementById('photo-preview');
+    preview.innerHTML = '';
+
+    if (settings.photoUrl) {
+        const img = document.createElement('img');
+        img.src = settings.photoUrl;
+        preview.appendChild(img);
+    } else {
+        const emoji = document.createElement('span');
+        emoji.className = 'photo-preview-emoji';
+        emoji.textContent = '🌸';
+        preview.appendChild(emoji);
+    }
 }
 
 // ============ Settings ============
@@ -377,6 +412,11 @@ function openSettings() {
     document.getElementById('notif-browser').checked = settings.notifBrowser;
     document.getElementById('email-input').value = settings.email;
 
+    // Photo preview
+    renderPhotoPreview();
+    document.getElementById('photo-url-input').value = '';
+    document.getElementById('photo-url-input').style.display = 'none';
+
     // Update meal time pills
     document.querySelectorAll('.time-pill').forEach(pill => {
         const time = pill.dataset.time;
@@ -406,6 +446,7 @@ function saveSettingsFromModal() {
         .map(pill => pill.dataset.time);
 
     saveSettingsToStorage();
+    renderAvatar();
     closeSettingsModal();
     showBadge('✅ Pengaturan tersimpan');
 
@@ -413,6 +454,69 @@ function saveSettingsFromModal() {
     if (settings.notifBrowser && Notification.permission === 'default') {
         Notification.requestPermission();
     }
+}
+
+// ============ Photo Upload Handlers ============
+function handlePhotoUpload(file) {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        showBadge('❌ File harus gambar');
+        return;
+    }
+
+    // Validate size (max 2MB to avoid localStorage issues)
+    if (file.size > 2 * 1024 * 1024) {
+        showBadge('❌ Ukuran foto max 2MB');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const base64 = e.target.result;
+        settings.photoUrl = base64;
+        saveSettingsToStorage();
+        renderPhotoPreview();
+        showBadge('✅ Foto tersimpan');
+    };
+    reader.onerror = () => {
+        showBadge('❌ Gagal baca file');
+    };
+    reader.readAsDataURL(file);
+}
+
+function handlePhotoUrl() {
+    const urlInput = document.getElementById('photo-url-input');
+    const url = urlInput.value.trim();
+
+    if (!url) {
+        showBadge('❌ URL kosong');
+        return;
+    }
+
+    // Validate URL format
+    try {
+        new URL(url);
+    } catch (e) {
+        showBadge('❌ URL tidak valid');
+        return;
+    }
+
+    settings.photoUrl = url;
+    saveSettingsToStorage();
+    renderPhotoPreview();
+    urlInput.value = '';
+    urlInput.style.display = 'none';
+    showBadge('✅ Foto dari URL tersimpan');
+}
+
+function removePhoto() {
+    settings.photoUrl = '';
+    saveSettingsToStorage();
+    renderPhotoPreview();
+    document.getElementById('photo-url-input').style.display = 'none';
+    showBadge('🗑️ Foto direset ke 🌸');
 }
 
 function showBadge(text) {
@@ -467,6 +571,34 @@ function setupEventListeners() {
             pill.classList.toggle('active');
         });
     });
+
+    // Photo upload handlers
+    document.getElementById('upload-photo-btn').addEventListener('click', () => {
+        document.getElementById('photo-file').click();
+    });
+
+    document.getElementById('photo-file').addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handlePhotoUpload(e.target.files[0]);
+            e.target.value = '';  // Reset input
+        }
+    });
+
+    document.getElementById('use-url-btn').addEventListener('click', () => {
+        const urlInput = document.getElementById('photo-url-input');
+        urlInput.style.display = urlInput.style.display === 'none' ? 'block' : 'none';
+        if (urlInput.style.display === 'block') {
+            urlInput.focus();
+        }
+    });
+
+    document.getElementById('photo-url-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            handlePhotoUrl();
+        }
+    });
+
+    document.getElementById('remove-photo-btn').addEventListener('click', removePhoto);
 
     // Suggestion chips
     document.querySelectorAll('.suggestion-chip').forEach(chip => {
