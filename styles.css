@@ -623,12 +623,50 @@ html, body {
 }
 
 /* ============ Schedule Page ============ */
+.schedule-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .schedule-tabs {
     display: flex;
     gap: 4px;
     background: var(--bg-secondary);
     padding: 4px;
     border-radius: 8px;
+}
+
+.filter-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 6px 14px;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.filter-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.filter-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
 }
 
 .tab-btn {
@@ -706,10 +744,22 @@ html, body {
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s;
+    position: relative;
 }
 
 .event-pill:hover {
     transform: translateX(2px);
+}
+
+.event-pill.past {
+    opacity: 0.6;
+    border-left-color: var(--text-muted);
+    background: var(--bg-secondary);
+}
+
+.event-pill.fired {
+    border-left-color: var(--success);
+    background: rgba(74, 222, 128, 0.08);
 }
 
 .event-time {
@@ -719,12 +769,52 @@ html, body {
     margin-bottom: 2px;
 }
 
+.event-pill.past .event-time {
+    color: var(--text-muted);
+}
+
 .event-title {
     font-size: 12px;
     color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    padding-right: 18px;
+}
+
+.event-status {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 10px;
+}
+
+.event-delete {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    color: var(--text-muted);
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.event-pill:hover .event-delete {
+    opacity: 1;
+}
+
+.event-delete:hover {
+    background: var(--danger);
+    color: white;
 }
 
 .no-events {

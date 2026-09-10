@@ -1422,6 +1422,22 @@ function setupEventListeners() {
     if (exportIcsBtn) {
         exportIcsBtn.addEventListener('click', exportICS);
     }
+
+    // Schedule filter tabs
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentScheduleFilter = btn.dataset.filter;
+            renderWeekView();
+        });
+    });
+
+    // Cleanup past reminders
+    const cleanupBtn = document.getElementById('cleanup-past-btn');
+    if (cleanupBtn) {
+        cleanupBtn.addEventListener('click', cleanupPastReminders);
+    }
 }
 
 // ============ Service Worker (for PWA) ============
@@ -1444,6 +1460,7 @@ const MAX_NOTES = 100;
 let notes = [];
 let reminders = [];  // Local reminders (separate from Worker KV)
 let currentWeekStart = getWeekStart(new Date());
+let currentScheduleFilter = 'all';  // all | upcoming | past
 
 function getWeekStart(date) {
     const d = new Date(date);
@@ -1611,6 +1628,7 @@ function renderWeekView() {
     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const now = Date.now();
 
     for (let i = 0; i < 7; i++) {
         const date = new Date(currentWeekStart);
@@ -1619,7 +1637,13 @@ function renderWeekView() {
 
         const dayEvents = reminders.filter(r => {
             const rDate = new Date(r.datetime);
-            return rDate.toDateString() === date.toDateString();
+            if (rDate.toDateString() !== date.toDateString()) return false;
+
+            // Apply filter
+            const isPast = new Date(r.datetime).getTime() < now;
+            if (currentScheduleFilter === 'upcoming' && isPast) return false;
+            if (currentScheduleFilter === 'past' && !isPast) return false;
+            return true;
         }).sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
 
         const col = document.createElement('div');
@@ -1631,12 +1655,19 @@ function renderWeekView() {
             </div>
             <div class="day-events">
                 ${dayEvents.length > 0
-                    ? dayEvents.map(e => `
-                        <div class="event-pill" data-id="${e.id}">
-                            <div class="event-time">${formatTime(e.datetime)}</div>
-                            <div class="event-title">${escapeHtml(e.title)}</div>
-                        </div>
-                    `).join('')
+                    ? dayEvents.map(e => {
+                        const isPast = new Date(e.datetime).getTime() < now;
+                        const fired = e.fired || isPast;
+                        const statusClass = isPast ? (fired ? 'fired' : 'past') : '';
+                        const statusIcon = isPast ? (fired ? '✅' : '⏰') : '';
+                        return `
+                            <div class="event-pill ${statusClass}" data-id="${e.id}">
+                                <div class="event-time">${formatTime(e.datetime)} ${statusIcon}</div>
+                                <div class="event-title">${escapeHtml(e.title)}</div>
+                                <button class="event-delete" data-id="${e.id}" title="Hapus">🗑️</button>
+                            </div>
+                        `;
+                    }).join('')
                     : '<div class="no-events">Tidak ada jadwal</div>'
                 }
             </div>
@@ -1652,10 +1683,25 @@ function renderWeekView() {
         // Click event to view/edit
         col.querySelectorAll('.event-pill').forEach(pill => {
             pill.addEventListener('click', (e) => {
+                if (e.target.classList.contains('event-delete')) return;
                 e.stopPropagation();
                 const id = parseFloat(pill.dataset.id);
                 const reminder = reminders.find(r => r.id === id);
                 if (reminder) openReminderModal(null, reminder);
+            });
+        });
+
+        // Delete button
+        col.querySelectorAll('.event-delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = parseFloat(btn.dataset.id);
+                const reminder = reminders.find(r => r.id === id);
+                if (reminder) {
+                    if (confirm(`Hapus jadwal "${reminder.title}"?`)) {
+                        deleteReminder(id);
+                    }
+                }
             });
         });
 
@@ -1760,12 +1806,27 @@ function saveReminderFromModal() {
 }
 
 function deleteReminder(id) {
-    if (!confirm('Hapus jadwal ini?')) return;
     reminders = reminders.filter(r => r.id !== id);
     saveReminders();
     renderWeekView();
     scheduleLocalReminders();
     showBadge('🗑️ Jadwal dihapus');
+}
+
+function cleanupPastReminders() {
+    const now = Date.now();
+    const pastReminders = reminders.filter(r => new Date(r.datetime).getTime() < now);
+    if (pastReminders.length === 0) {
+        showBadge('✨ Gak ada jadwal yang udah lewat');
+        return;
+    }
+    if (confirm(`Hapus ${pastReminders.length} jadwal yang udah lewat?\n\n${pastReminders.slice(0, 5).map(r => `• ${r.title} (${new Date(r.datetime).toLocaleDateString('id-ID')})`).join('\n')}${pastReminders.length > 5 ? `\n... dan ${pastReminders.length - 5} lainnya` : ''}`)) {
+        reminders = reminders.filter(r => new Date(r.datetime).getTime() >= now);
+        saveReminders();
+        renderWeekView();
+        scheduleLocalReminders();
+        showBadge(`🧹 ${pastReminders.length} jadwal udah lewat berhasil dihapus`);
+    }
 }
 
 // ============ Local Reminder Scheduling ============

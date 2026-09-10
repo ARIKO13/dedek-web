@@ -149,10 +149,20 @@
             <section class="page page-schedule" id="page-schedule">
                 <div class="page-header">
                     <h2>📅 Jadwal</h2>
-                    <div class="schedule-tabs">
-                        <button class="tab-btn active" data-tab="weekly">Mingguan</button>
-                        <button class="tab-btn" data-tab="gcal">Google Calendar</button>
+                    <div class="schedule-header-actions">
+                        <button class="btn-danger-small" id="cleanup-past-btn" title="Hapus yang udah lewat">🧹 Cleanup</button>
+                        <div class="schedule-tabs">
+                            <button class="tab-btn active" data-tab="weekly">Mingguan</button>
+                            <button class="tab-btn" data-tab="gcal">Google Calendar</button>
+                        </div>
                     </div>
+                </div>
+
+                <!-- Filter for reminders -->
+                <div class="filter-tabs">
+                    <button class="filter-btn active" data-filter="all">Semua</button>
+                    <button class="filter-btn" data-filter="upcoming">⏳ Mendatang</button>
+                    <button class="filter-btn" data-filter="past">✅ Udah Lewat</button>
                 </div>
 
                 <!-- Weekly View -->
