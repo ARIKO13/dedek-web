@@ -699,6 +699,155 @@ function detectNoteCommand(message) {
     return null;
 }
 
+// ============ Detect Time in Natural Language (Indonesian) ============
+// Returns Date object or null
+function detectTimeInText(text) {
+    const lower = text.toLowerCase().trim();
+    const now = new Date();
+    const target = new Date(now);
+
+    // Pattern 1: explicit time "jam HH:MM" or "pukul HH:MM"
+    let m = lower.match(/(?:jam|pukul)\s*(\d{1,2})[:.](\d{2})/i);
+    if (m) {
+        target.setHours(parseInt(m[1]), parseInt(m[2]), 0, 0);
+        if (target <= now) target.setDate(target.getDate() + 1);
+        return { date: target, source: m[0] };
+    }
+
+    m = lower.match(/(?:jam|pukul)\s*(\d{1,2})(?!\d|[:.])/i);
+    if (m) {
+        target.setHours(parseInt(m[1]), 0, 0, 0);
+        if (target <= now) target.setDate(target.getDate() + 1);
+        return { date: target, source: m[0] };
+    }
+
+    // Pattern 2: HH:MM without "jam"
+    m = lower.match(/(\d{1,2})[:.](\d{2})\s*(?:wib|pagi|siang|sore|malam)?/i);
+    if (m && !lower.includes('tgl') && !lower.includes('tanggal')) {
+        target.setHours(parseInt(m[1]), parseInt(m[2]), 0, 0);
+        if (target <= now) target.setDate(target.getDate() + 1);
+        return { date: target, source: m[0] };
+    }
+
+    // Pattern 3: relative days
+    if (/\b(lusa|besok\s+lusa|2\s+hari\s+lagi)\b/i.test(lower)) {
+        target.setDate(target.getDate() + 2);
+        target.setHours(9, 0, 0, 0);
+        const matched = lower.match(/\b(lusa|besok\s+lusa|2\s+hari\s+lagi)\b/i);
+        return { date: target, source: matched[0] };
+    }
+
+    if (/\b(besok|bsk)\b/i.test(lower)) {
+        target.setDate(target.getDate() + 1);
+
+        // Check for time of day
+        if (/pagi/i.test(lower)) {
+            target.setHours(8, 0, 0, 0);
+            return { date: target, source: 'besok pagi' };
+        }
+        if (/siang/i.test(lower)) {
+            target.setHours(12, 0, 0, 0);
+            return { date: target, source: 'besok siang' };
+        }
+        if (/sore/i.test(lower)) {
+            target.setHours(16, 0, 0, 0);
+            return { date: target, source: 'besok sore' };
+        }
+        if (/malam/i.test(lower)) {
+            target.setHours(19, 0, 0, 0);
+            return { date: target, source: 'besok malam' };
+        }
+        target.setHours(9, 0, 0, 0);
+        return { date: target, source: 'besok' };
+    }
+
+    // Pattern 4: "nanti pagi/siang/sore/malam"
+    m = lower.match(/\bnanti\s+(pagi|siang|sore|malam)\b/i);
+    if (m) {
+        const times = { pagi: 8, siang: 12, sore: 16, malam: 19 };
+        target.setHours(times[m[1]], 0, 0, 0);
+        if (target <= now) target.setDate(target.getDate() + 1);
+        return { date: target, source: m[0] };
+    }
+
+    // Pattern 5: hari ini + time of day
+    m = lower.match(/\b(?:hari\s+ini)?\s*(pagi|siang|sore|malam)\b/i);
+    if (m && !lower.includes('besok')) {
+        const times = { pagi: 8, siang: 12, sore: 16, malam: 19 };
+        target.setHours(times[m[1]], 0, 0, 0);
+        if (target <= now) target.setDate(target.getDate() + 1);
+        return { date: target, source: m[0] };
+    }
+
+    // Pattern 6: next week days
+    const days = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
+    for (let i = 0; i < days.length; i++) {
+        const re = new RegExp(`\\b(?:${days[i]})\\s*(?:depan|besok)?\\b`, 'i');
+        m = lower.match(re);
+        if (m) {
+            const today = now.getDay();
+            let diff = (i - today + 7) % 7;
+            if (diff === 0) diff = 7;  // Next same day = next week
+            target.setDate(target.getDate() + diff);
+
+            if (/pagi/i.test(lower)) target.setHours(8, 0, 0, 0);
+            else if (/siang/i.test(lower)) target.setHours(12, 0, 0, 0);
+            else if (/sore/i.test(lower)) target.setHours(16, 0, 0, 0);
+            else if (/malam/i.test(lower)) target.setHours(19, 0, 0, 0);
+            else target.setHours(9, 0, 0, 0);
+
+            return { date: target, source: m[0] };
+        }
+    }
+
+    // Pattern 7: "akhir bulan" / "pertengahan bulan"
+    if (/akhir\s+bulan/i.test(lower)) {
+        const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+        target.setDate(lastDay);
+        target.setHours(9, 0, 0, 0);
+        if (target <= now) target.setMonth(target.getMonth() + 1);
+        return { date: target, source: 'akhir bulan' };
+    }
+
+    if (/pertengahan\s+bulan/i.test(lower)) {
+        target.setDate(15);
+        target.setHours(9, 0, 0, 0);
+        if (target <= now) target.setMonth(target.getMonth() + 1);
+        return { date: target, source: 'pertengahan bulan' };
+    }
+
+    // Pattern 8: "X jam lagi", "X menit lagi", "X hari lagi"
+    m = lower.match(/(\d+)\s*jam\s*lagi/i);
+    if (m) {
+        target.setTime(target.getTime() + parseInt(m[1]) * 3600000);
+        return { date: target, source: m[0] };
+    }
+    m = lower.match(/(\d+)\s*menit\s*lagi/i);
+    if (m) {
+        target.setTime(target.getTime() + parseInt(m[1]) * 60000);
+        return { date: target, source: m[0] };
+    }
+    m = lower.match(/(\d+)\s*hari\s*lagi/i);
+    if (m) {
+        target.setDate(target.getDate() + parseInt(m[1]));
+        target.setHours(9, 0, 0, 0);
+        return { date: target, source: m[0] };
+    }
+
+    return null;
+}
+
+// Clean note content (remove time references for cleaner note body)
+function cleanTimeFromText(text, timeSource) {
+    if (!timeSource) return text;
+    // Replace time source with empty, clean up extra spaces
+    let cleaned = text.replace(new RegExp(timeSource.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+    // Remove common filler words left behind
+    cleaned = cleaned.replace(/\b(di|ke|pada|untuk|buat|yang)\s*$/i, '').trim();
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    return cleaned || text;  // Return original if cleaning made it empty
+}
+
 function addNoteFromChat(content) {
     // Cek apakah ada title (sebelum ":") dan body (setelah ":")
     let title = 'Catatan dari chat';
@@ -734,10 +883,61 @@ async function handleNoteFromChat(content) {
     // Save note locally
     const note = addNoteFromChat(content);
 
-    // Try sync to Worker (Google Keep if configured) - optional
-    // For now, just save locally
+    // Check if note contains time info → also save as reminder
+    const timeInfo = detectTimeInText(content);
 
-    const replyText = `📝 Udah aku catat ke halaman Catatan ya sayang 🌸\n\n**${note.title}**\n${note.body}\n\nCek di sidebar → 📝 Catatan 🤍`;
+    let replyText = `📝 Udah aku catat ke halaman Catatan ya sayang 🌸\n\n**${note.title}**\n${note.body}\n\nCek di sidebar → 📝 Catatan 🤍`;
+
+    if (timeInfo) {
+        // Also save to Schedule page as reminder
+        const reminderTitle = content.length > 50 ? content.substring(0, 50) + '...' : content;
+        const localReminder = {
+            id: Date.now() + Math.random(),
+            title: reminderTitle,
+            description: `Catatan dari chat: ${content}`,
+            datetime: timeInfo.date.toISOString(),
+            repeat: 'none',
+            notify: {
+                local: true,
+                discord: settings.notifDiscord,
+                email: settings.notifEmail && !!settings.email,
+            },
+            createdAt: Date.now(),
+            fromChat: true,
+            fromNote: true,
+        };
+        reminders.push(localReminder);
+        saveReminders();
+        renderNavBadges();
+        scheduleLocalReminders();
+
+        // Sync to Worker
+        if (settings.workerUrl && (settings.notifDiscord || settings.notifEmail)) {
+            try {
+                await fetch(`${settings.workerUrl}/reminders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        task: reminderTitle,
+                        remind_at: timeInfo.date.toISOString(),
+                        user_name: settings.userName,
+                        notify: {
+                            discord: settings.notifDiscord,
+                            email: settings.notifEmail && settings.email,
+                            email_to: settings.email,
+                        },
+                    }),
+                });
+            } catch (e) {
+                console.warn('Failed to sync reminder to Worker:', e);
+            }
+        }
+
+        const timeStr = timeInfo.date.toLocaleString('id-ID', {
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+        });
+        replyText = `📝 Udah aku catat ke halaman Catatan ya sayang 🌸\n\n**${note.title}**\n${note.body}\n\n📅 Aku juga bikin reminder di halaman Jadwal: **${reminderTitle}** pada ${timeStr} (${timeInfo.source})\n\nCek di sidebar → 📝 Catatan & 📅 Jadwal 🤍`;
+    }
 
     const botMsg = { text: replyText, role: 'bot', timestamp: Date.now() };
     messages.push(botMsg);
