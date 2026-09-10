@@ -80,9 +80,28 @@ const MEAL_TEMPLATES = [
     'Reminder makan dari aku 🤍 Makan yang enak ya',
 ];
 
-// ============ In-memory reminder storage (resets on deploy)
-// For production, use Cloudflare D1 or KV for persistent storage
-let reminders = [];
+// ============ Reminder Storage (Cloudflare KV - persistent) ============
+// Pakai KV biar reminders survive across Worker instances (cron vs request)
+// KV free: 100k reads/day, 1k writes/day - cukup buat reminders
+const REMINDERS_KV_KEY = 'pending_reminders';
+
+async function loadReminders(env) {
+    try {
+        const value = await env.REMINDERS_KV.get(REMINDERS_KV_KEY);
+        return value ? JSON.parse(value) : [];
+    } catch (error) {
+        console.error('Failed to load reminders from KV:', error);
+        return [];
+    }
+}
+
+async function saveReminders(env, reminders) {
+    try {
+        await env.REMINDERS_KV.put(REMINDERS_KV_KEY, JSON.stringify(reminders));
+    } catch (error) {
+        console.error('Failed to save reminders to KV:', error);
+    }
+}
 
 // ============ Main Worker ============
 export default {
@@ -130,6 +149,7 @@ export default {
             }
 
             if (path === '/reminders' && method === 'GET') {
+                const reminders = await loadReminders(env);
                 return jsonResponse({ reminders: reminders.filter(r => !r.fired) }, 200, corsHeaders);
             }
 
@@ -1392,7 +1412,7 @@ async function handleCreateReminder(request, env, corsHeaders) {
     }
 
     const reminder = {
-        id: Date.now() + Math.random(),
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
         task,
         remind_at,
         user_name: user_name || 'Sayang',
@@ -1401,7 +1421,10 @@ async function handleCreateReminder(request, env, corsHeaders) {
         created_at: new Date().toISOString(),
     };
 
+    // Load existing reminders, add new one, save back to KV
+    const reminders = await loadReminders(env);
     reminders.push(reminder);
+    await saveReminders(env, reminders);
 
     return jsonResponse({
         success: true,
@@ -1413,6 +1436,13 @@ async function handleCreateReminder(request, env, corsHeaders) {
 // ============ Cron: Check Reminders ============
 async function checkReminders(env) {
     const now = new Date();
+    const reminders = await loadReminders(env);
+
+    if (reminders.length === 0) {
+        return;
+    }
+
+    let hasChanges = false;
 
     // Check user reminders
     for (const reminder of reminders) {
@@ -1422,19 +1452,30 @@ async function checkReminders(env) {
         if (remindAt <= now) {
             await fireReminder(reminder, env);
             reminder.fired = true;
+            hasChanges = true;
         }
     }
 
     // Cleanup old fired reminders (>24h ago)
-    reminders = reminders.filter(r => {
+    const originalLength = reminders.length;
+    const cleanedReminders = reminders.filter(r => {
         if (!r.fired) return true;
         const firedAt = new Date(r.remind_at);
         return (now - firedAt) < 86400000;
     });
 
-    // Check meal reminders (12:00, 18:00, 21:00)
-    const hour = now.getHours();
-    const minute = now.getMinutes();
+    if (cleanedReminders.length !== originalLength) {
+        hasChanges = true;
+    }
+
+    if (hasChanges) {
+        await saveReminders(env, cleanedReminders);
+    }
+
+    // Check meal reminders (12:00, 18:00, 21:00 Jakarta time)
+    const nowJakarta = getJakartaTime();
+    const hour = parseInt(nowJakarta.time.split(':')[0]);
+    const minute = parseInt(nowJakarta.time.split(':')[1]);
     const mealTimes = [
         { hour: 12, minute: 0 },
         { hour: 18, minute: 0 },
@@ -1443,13 +1484,12 @@ async function checkReminders(env) {
 
     for (const meal of mealTimes) {
         if (hour === meal.hour && minute === meal.minute) {
-            // Avoid duplicate meal reminders within same minute
-            const cacheKey = `meal-${hour}-${now.getDate()}`;
-            if (!globalThis[cacheKey]) {
-                globalThis[cacheKey] = true;
+            // Use KV to track meal sent status (avoid duplicate within same minute)
+            const todayKey = `meal_sent_${nowJakarta.weekday}_${meal.hour}_${nowJakarta.date.replace(/\s/g, '_')}`;
+            const alreadySent = await env.REMINDERS_KV.get(todayKey);
+            if (!alreadySent) {
+                await env.REMINDERS_KV.put(todayKey, '1', { expirationTtl: 600 });
                 await sendMealReminder(env);
-                // Clear cache after 2 minutes
-                setTimeout(() => delete globalThis[cacheKey], 120000);
             }
         }
     }

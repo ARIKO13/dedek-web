@@ -6,6 +6,11 @@ compatibility_date = "2024-09-23"
 [ai]
 binding = "AI"
 
+# KV Storage untuk persistent reminders (free, 100k reads + 1k writes/day)
+[[kv_namespaces]]
+binding = "REMINDERS_KV"
+id = "8c1e144cb3e043dc940c4f018d9df620"
+
 # Cron Triggers - run every minute to check reminders
 [triggers]
 crons = ["* * * * *"]
