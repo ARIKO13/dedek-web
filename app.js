@@ -1021,6 +1021,106 @@ function setupEventListeners() {
             sendMessage(msg);
         });
     });
+
+    // ============ Page Navigation ============
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            switchPage(item.dataset.page);
+        });
+    });
+
+    // Mobile sidebar toggle
+    const menuToggle = document.getElementById('menu-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+    if (menuToggle) {
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            sidebarOverlay.style.display = sidebar.classList.contains('open') ? 'block' : 'none';
+        });
+    }
+    if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            sidebarOverlay.style.display = 'none';
+        });
+    }
+
+    // Mobile notif button (opens panel like desktop)
+    const notifBtnMobile = document.getElementById('notif-btn-mobile');
+    if (notifBtnMobile) {
+        notifBtnMobile.addEventListener('click', () => {
+            document.getElementById('notif-panel').style.display = 'flex';
+            setTimeout(() => {
+                notifications.forEach(n => n.read = true);
+                saveNotifications();
+                renderNotifications();
+            }, 2000);
+        });
+    }
+
+    // ============ Notes ============
+    const addNoteBtn = document.getElementById('add-note-btn');
+    if (addNoteBtn) {
+        addNoteBtn.addEventListener('click', () => openNoteModal());
+    }
+
+    // ============ Schedule ============
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const tabName = tab.dataset.tab;
+            document.getElementById('weekly-content').style.display = tabName === 'weekly' ? 'block' : 'none';
+            document.getElementById('gcal-content').style.display = tabName === 'gcal' ? 'block' : 'none';
+            if (tabName === 'gcal') renderGCalEvents();
+        });
+    });
+
+    // Week navigation
+    const prevWeek = document.getElementById('prev-week');
+    const todayWeek = document.getElementById('today-week');
+    const nextWeek = document.getElementById('next-week');
+
+    if (prevWeek) {
+        prevWeek.addEventListener('click', () => {
+            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+            renderWeekView();
+        });
+    }
+    if (todayWeek) {
+        todayWeek.addEventListener('click', () => {
+            currentWeekStart = getWeekStart(new Date());
+            renderWeekView();
+        });
+    }
+    if (nextWeek) {
+        nextWeek.addEventListener('click', () => {
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+            renderWeekView();
+        });
+    }
+
+    // Reminder modal
+    const closeReminderModalBtn = document.getElementById('close-reminder-modal');
+    const cancelReminderBtn = document.getElementById('cancel-reminder');
+    const saveReminderBtn = document.getElementById('save-reminder');
+    const reminderModal = document.getElementById('add-reminder-modal');
+
+    if (closeReminderModalBtn) closeReminderModalBtn.addEventListener('click', closeReminderModal);
+    if (cancelReminderBtn) cancelReminderBtn.addEventListener('click', closeReminderModal);
+    if (saveReminderBtn) saveReminderBtn.addEventListener('click', saveReminderFromModal);
+    if (reminderModal) {
+        reminderModal.querySelector('.modal-overlay').addEventListener('click', closeReminderModal);
+    }
+
+    // ICS export
+    const exportIcsBtn = document.getElementById('export-ics-btn');
+    if (exportIcsBtn) {
+        exportIcsBtn.addEventListener('click', exportICS);
+    }
 }
 
 // ============ Service Worker (for PWA) ============
@@ -1035,5 +1135,479 @@ async function setupServiceWorker() {
     }
 }
 
+// ============ Page Navigation ============
+const STORAGE_NOTES_KEY = 'dedek-notes';
+const STORAGE_REMINDERS_KEY = 'dedek-reminders';
+const MAX_NOTES = 100;
+
+let notes = [];
+let reminders = [];  // Local reminders (separate from Worker KV)
+let currentWeekStart = getWeekStart(new Date());
+
+function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();  // 0 = Sunday
+    const diff = d.getDate() - day;
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function loadNotes() {
+    try {
+        const saved = localStorage.getItem(STORAGE_NOTES_KEY);
+        notes = saved ? JSON.parse(saved) : [];
+    } catch (e) {
+        console.warn('Failed to load notes:', e);
+        notes = [];
+    }
+}
+
+function saveNotes() {
+    try {
+        if (notes.length > MAX_NOTES) {
+            notes = notes.slice(0, MAX_NOTES);
+        }
+        localStorage.setItem(STORAGE_NOTES_KEY, JSON.stringify(notes));
+    } catch (e) {
+        console.warn('Failed to save notes:', e);
+    }
+}
+
+function loadReminders() {
+    try {
+        const saved = localStorage.getItem(STORAGE_REMINDERS_KEY);
+        reminders = saved ? JSON.parse(saved) : [];
+    } catch (e) {
+        console.warn('Failed to load reminders:', e);
+        reminders = [];
+    }
+}
+
+function saveReminders() {
+    try {
+        localStorage.setItem(STORAGE_REMINDERS_KEY, JSON.stringify(reminders));
+        renderNavBadges();
+    } catch (e) {
+        console.warn('Failed to save reminders:', e);
+    }
+}
+
+function switchPage(pageName) {
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    // Show selected page
+    const page = document.getElementById(`page-${pageName}`);
+    if (page) page.classList.add('active');
+
+    // Update nav items
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const navItem = document.querySelector(`.nav-item[data-page="${pageName}"]`);
+    if (navItem) navItem.classList.add('active');
+
+    // Update mobile header title
+    const titles = { chat: 'Chat', notes: 'Catatan', schedule: 'Jadwal' };
+    document.getElementById('mobile-page-title').textContent = titles[pageName] || pageName;
+
+    // Close sidebar on mobile
+    if (window.innerWidth <= 768) {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar-overlay').style.display = 'none';
+    }
+
+    // Render page-specific content
+    if (pageName === 'notes') renderNotes();
+    if (pageName === 'schedule') renderWeekView();
+
+    // Scroll chat to bottom
+    if (pageName === 'chat') {
+        setTimeout(() => {
+            document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight;
+        }, 100);
+    }
+}
+
+// ============ Notes Feature ============
+function renderNotes() {
+    const container = document.getElementById('notes-container');
+    if (notes.length === 0) {
+        container.innerHTML = `
+            <div class="notes-empty">
+                <div class="empty-icon">📝</div>
+                <p>Belum ada catatan</p>
+                <small>Klik "Tambah" untuk bikin catatan pertama kamu</small>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = '';
+    notes.forEach(note => {
+        const card = document.createElement('div');
+        card.className = 'note-card';
+        card.innerHTML = `
+            <div class="note-title">${escapeHtml(note.title || 'Tanpa judul')}</div>
+            <div class="note-body">${escapeHtml(note.body || '')}</div>
+            <div class="note-time">${formatNotifTime(note.timestamp)}</div>
+            <div class="note-actions">
+                <button class="note-action-btn edit-note" data-id="${note.id}">✏️</button>
+                <button class="note-action-btn danger delete-note" data-id="${note.id}">🗑️</button>
+            </div>
+        `;
+        card.querySelector('.edit-note').addEventListener('click', (e) => {
+            e.stopPropagation();
+            openNoteModal(note);
+        });
+        card.querySelector('.delete-note').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteNote(note.id);
+        });
+        card.addEventListener('click', () => openNoteModal(note));
+        container.appendChild(card);
+    });
+}
+
+function openNoteModal(note = null) {
+    // Use simple prompt for now (can be replaced with modal later)
+    const isEdit = !!note;
+    const title = prompt('Judul catatan:', note?.title || '');
+    if (title === null) return;  // User cancelled
+    const body = prompt('Isi catatan:', note?.body || '');
+    if (body === null) return;
+
+    if (isEdit) {
+        note.title = title;
+        note.body = body;
+        note.updatedAt = Date.now();
+    } else {
+        notes.unshift({
+            id: Date.now() + Math.random(),
+            title,
+            body,
+            timestamp: Date.now(),
+        });
+    }
+    saveNotes();
+    renderNotes();
+    renderNavBadges();
+    showBadge(isEdit ? '✅ Catatan diupdate' : '✅ Catatan tersimpan');
+}
+
+function deleteNote(id) {
+    if (!confirm('Hapus catatan ini?')) return;
+    notes = notes.filter(n => n.id !== id);
+    saveNotes();
+    renderNotes();
+    renderNavBadges();
+    showBadge('🗑️ Catatan dihapus');
+}
+
+// ============ Schedule Feature ============
+function renderWeekView() {
+    const grid = document.getElementById('week-grid');
+    grid.innerHTML = '';
+
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(currentWeekStart);
+        date.setDate(date.getDate() + i);
+        const isToday = date.getTime() === today.getTime();
+
+        const dayEvents = reminders.filter(r => {
+            const rDate = new Date(r.datetime);
+            return rDate.toDateString() === date.toDateString();
+        }).sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+
+        const col = document.createElement('div');
+        col.className = `day-column ${isToday ? 'today' : ''}`;
+        col.innerHTML = `
+            <div class="day-header">
+                <div class="day-name">${days[i]}</div>
+                <div class="day-number">${date.getDate()}</div>
+            </div>
+            <div class="day-events">
+                ${dayEvents.length > 0
+                    ? dayEvents.map(e => `
+                        <div class="event-pill" data-id="${e.id}">
+                            <div class="event-time">${formatTime(e.datetime)}</div>
+                            <div class="event-title">${escapeHtml(e.title)}</div>
+                        </div>
+                    `).join('')
+                    : '<div class="no-events">Tidak ada jadwal</div>'
+                }
+            </div>
+        `;
+
+        // Click on empty area to add event
+        col.addEventListener('click', (e) => {
+            if (e.target.classList.contains('day-column') || e.target.classList.contains('day-events') || e.target.classList.contains('no-events')) {
+                openReminderModal(date);
+            }
+        });
+
+        // Click event to view/edit
+        col.querySelectorAll('.event-pill').forEach(pill => {
+            pill.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = parseFloat(pill.dataset.id);
+                const reminder = reminders.find(r => r.id === id);
+                if (reminder) openReminderModal(null, reminder);
+            });
+        });
+
+        grid.appendChild(col);
+    }
+}
+
+function formatTime(datetime) {
+    const d = new Date(datetime);
+    return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+}
+
+function openReminderModal(date = null, existingReminder = null) {
+    const modal = document.getElementById('add-reminder-modal');
+    const isEdit = !!existingReminder;
+
+    // Reset form
+    document.getElementById('reminder-title').value = '';
+    document.getElementById('reminder-desc').value = '';
+    document.getElementById('reminder-time').value = '09:00';
+    document.getElementById('reminder-repeat').value = 'none';
+    document.getElementById('reminder-notif-local').checked = true;
+    document.getElementById('reminder-notif-discord').checked = false;
+    document.getElementById('reminder-notif-email').checked = false;
+
+    // Set date
+    const dateInput = document.getElementById('reminder-date');
+    if (date) {
+        dateInput.value = date.toISOString().split('T')[0];
+    } else if (existingReminder) {
+        const d = new Date(existingReminder.datetime);
+        dateInput.value = d.toISOString().split('T')[0];
+        document.getElementById('reminder-title').value = existingReminder.title;
+        document.getElementById('reminder-desc').value = existingReminder.description || '';
+        document.getElementById('reminder-time').value = d.toTimeString().substring(0, 5);
+        document.getElementById('reminder-repeat').value = existingReminder.repeat || 'none';
+        document.getElementById('reminder-notif-local').checked = existingReminder.notify?.local ?? true;
+        document.getElementById('reminder-notif-discord').checked = existingReminder.notify?.discord ?? false;
+        document.getElementById('reminder-notif-email').checked = existingReminder.notify?.email ?? false;
+    } else {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    modal.style.display = 'flex';
+    modal.dataset.editId = isEdit ? existingReminder.id : '';
+}
+
+function closeReminderModal() {
+    document.getElementById('add-reminder-modal').style.display = 'none';
+}
+
+function saveReminderFromModal() {
+    const title = document.getElementById('reminder-title').value.trim();
+    const date = document.getElementById('reminder-date').value;
+    const time = document.getElementById('reminder-time').value;
+    const desc = document.getElementById('reminder-desc').value.trim();
+    const repeat = document.getElementById('reminder-repeat').value;
+
+    if (!title) {
+        showBadge('❌ Judul wajib diisi');
+        return;
+    }
+    if (!date || !time) {
+        showBadge('❌ Tanggal dan jam wajib diisi');
+        return;
+    }
+
+    const datetime = new Date(`${date}T${time}:00`);
+    const editId = document.getElementById('add-reminder-modal').dataset.editId;
+
+    const reminderData = {
+        id: editId ? parseFloat(editId) : Date.now() + Math.random(),
+        title,
+        description: desc,
+        datetime: datetime.toISOString(),
+        repeat,
+        notify: {
+            local: document.getElementById('reminder-notif-local').checked,
+            discord: document.getElementById('reminder-notif-discord').checked,
+            email: document.getElementById('reminder-notif-email').checked,
+        },
+        createdAt: Date.now(),
+    };
+
+    if (editId) {
+        const idx = reminders.findIndex(r => r.id === parseFloat(editId));
+        if (idx >= 0) reminders[idx] = { ...reminders[idx], ...reminderData };
+    } else {
+        reminders.push(reminderData);
+    }
+
+    saveReminders();
+    closeReminderModal();
+    renderWeekView();
+    scheduleLocalReminders();
+    showBadge(editId ? '✅ Jadwal diupdate' : '✅ Jadwal ditambahkan');
+
+    // Sync to Worker if Discord/email enabled
+    if (reminderData.notify.discord || reminderData.notify.email) {
+        syncReminderToWorker(reminderData);
+    }
+}
+
+function deleteReminder(id) {
+    if (!confirm('Hapus jadwal ini?')) return;
+    reminders = reminders.filter(r => r.id !== id);
+    saveReminders();
+    renderWeekView();
+    scheduleLocalReminders();
+    showBadge('🗑️ Jadwal dihapus');
+}
+
+// ============ Local Reminder Scheduling ============
+let scheduledReminderTimers = [];
+
+function scheduleLocalReminders() {
+    // Clear existing
+    scheduledReminderTimers.forEach(id => clearTimeout(id));
+    scheduledReminderTimers = [];
+
+    const now = Date.now();
+
+    reminders.forEach(reminder => {
+        const fireTime = new Date(reminder.datetime).getTime();
+        const delay = fireTime - now;
+
+        // Schedule if within next 24 hours
+        if (delay > 0 && delay < 86400000 && reminder.notify?.local) {
+            const timerId = setTimeout(() => {
+                addNotification({
+                    title: `⏰ ${reminder.title}`,
+                    body: reminder.description || 'Waktunya nih sayang! 🤍',
+                    icon: '⏰',
+                    type: 'reminder',
+                });
+            }, delay);
+            scheduledReminderTimers.push(timerId);
+        }
+    });
+}
+
+async function syncReminderToWorker(reminder) {
+    if (!settings.workerUrl) return;
+
+    try {
+        await fetch(`${settings.workerUrl}/reminders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task: reminder.title,
+                remind_at: reminder.datetime,
+                user_name: settings.userName,
+                notify: {
+                    discord: reminder.notify.discord,
+                    email: reminder.notify.email && settings.email,
+                    email_to: settings.email,
+                },
+            }),
+        });
+    } catch (e) {
+        console.warn('Failed to sync reminder to Worker:', e);
+    }
+}
+
+// ============ ICS Export (Google Calendar) ============
+function exportICS() {
+    if (reminders.length === 0) {
+        showBadge('❌ Belum ada jadwal untuk di-export');
+        return;
+    }
+
+    let ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Dedek Tersayang//Web App//ID',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+    ];
+
+    reminders.forEach(r => {
+        const dt = new Date(r.datetime);
+        const dtStart = dt.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        const dtEnd = new Date(dt.getTime() + 3600000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        const dtStamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+        ics.push('BEGIN:VEVENT');
+        ics.push(`UID:${r.id}@dedek-tersayang`);
+        ics.push(`DTSTAMP:${dtStamp}`);
+        ics.push(`DTSTART:${dtStart}`);
+        ics.push(`DTEND:${dtEnd}`);
+        ics.push(`SUMMARY:${escapeICS(r.title)}`);
+        if (r.description) ics.push(`DESCRIPTION:${escapeICS(r.description)}`);
+        ics.push('END:VEVENT');
+    });
+
+    ics.push('END:VCALENDAR');
+
+    // Download
+    const blob = new Blob([ics.join('\r\n')], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dedek-jadwal-${new Date().toISOString().split('T')[0]}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showBadge('✅ File .ics terdownload! Import ke Google Calendar');
+}
+
+function escapeICS(text) {
+    return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+function renderGCalEvents() {
+    const list = document.getElementById('gcal-events-list');
+    if (reminders.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Belum ada jadwal</p>';
+        return;
+    }
+
+    const upcoming = reminders
+        .filter(r => new Date(r.datetime) >= new Date())
+        .sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
+        .slice(0, 10);
+
+    list.innerHTML = upcoming.map(r => `
+        <div class="event-pill" style="margin-bottom: 6px">
+            <div class="event-time">${new Date(r.datetime).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+            <div class="event-title">${escapeHtml(r.title)}</div>
+        </div>
+    `).join('');
+}
+
+// ============ Navigation Badges ============
+function renderNavBadges() {
+    const notesBadge = document.getElementById('notes-badge');
+    const scheduleBadge = document.getElementById('schedule-badge');
+
+    notesBadge.textContent = notes.length;
+    notesBadge.style.display = notes.length > 0 ? 'flex' : 'none';
+
+    const upcoming = reminders.filter(r => new Date(r.datetime) >= new Date()).length;
+    scheduleBadge.textContent = upcoming;
+    scheduleBadge.style.display = upcoming > 0 ? 'flex' : 'none';
+}
+
 // ============ Init on load ============
-window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('DOMContentLoaded', () => {
+    init();
+    loadNotes();
+    loadReminders();
+    renderNavBadges();
+    scheduleLocalReminders();
+});

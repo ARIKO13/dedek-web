@@ -11,23 +11,43 @@
 </head>
 <body>
     <div class="app">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-avatar">
-                <div class="avatar-wrapper" id="avatar-wrapper">
-                    <span class="avatar-emoji" id="avatar-emoji">🌸</span>
-                    <img class="avatar-photo" id="avatar-photo" alt="" style="display:none">
-                </div>
-                <div class="header-info">
-                    <h1 class="header-name">Dedek Tersayang</h1>
-                    <span class="header-status" id="status-indicator">
-                        <span class="status-dot"></span>
-                        <span class="status-text">Online</span>
-                    </span>
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="header-avatar">
+                    <div class="avatar-wrapper" id="avatar-wrapper">
+                        <span class="avatar-emoji" id="avatar-emoji">🌸</span>
+                        <img class="avatar-photo" id="avatar-photo" alt="" style="display:none">
+                    </div>
+                    <div class="header-info">
+                        <h1 class="header-name">Dedek Tersayang</h1>
+                        <span class="header-status">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Online</span>
+                        </span>
+                    </div>
                 </div>
             </div>
-            <div class="header-actions">
-                <button class="icon-btn notif-btn" id="notif-btn" aria-label="Notifications">
+
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-page="chat">
+                    <span class="nav-icon">💬</span>
+                    <span class="nav-label">Chat</span>
+                </button>
+                <button class="nav-item" data-page="notes">
+                    <span class="nav-icon">📝</span>
+                    <span class="nav-label">Catatan</span>
+                    <span class="nav-badge" id="notes-badge" style="display:none">0</span>
+                </button>
+                <button class="nav-item" data-page="schedule">
+                    <span class="nav-icon">📅</span>
+                    <span class="nav-label">Jadwal</span>
+                    <span class="nav-badge" id="schedule-badge" style="display:none">0</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="icon-btn" id="notif-btn" aria-label="Notifications">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                         <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -41,7 +61,190 @@
                     </svg>
                 </button>
             </div>
-        </header>
+        </aside>
+
+        <!-- Mobile sidebar overlay -->
+        <div class="sidebar-overlay" id="sidebar-overlay" style="display:none"></div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Mobile header -->
+            <header class="mobile-header" id="mobile-header">
+                <button class="icon-btn" id="menu-toggle" aria-label="Menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
+                <h2 class="mobile-header-title" id="mobile-page-title">Chat</h2>
+                <div class="mobile-header-actions">
+                    <button class="icon-btn" id="notif-btn-mobile" aria-label="Notifications">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        <span class="notif-badge" id="notif-badge-mobile" style="display:none">0</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Page: Chat -->
+            <section class="page page-chat active" id="page-chat">
+                <div class="chat-area" id="chat-area">
+                    <div class="welcome-msg" id="welcome-msg">
+                        <div class="welcome-emoji">🤍</div>
+                        <h2>Halo Sayang!</h2>
+                        <p>Aku <strong>Dedek Tersayang</strong> di sini buat kamu 🌸<br>Cerita aja apa yang kamu rasain, aku dengerin dengan hati.</p>
+                        <div class="welcome-suggestions">
+                            <button class="suggestion-chip" data-msg="halo dedek, lagi apa?">👋 Halo, lagi apa?</button>
+                            <button class="suggestion-chip" data-msg="capek banget hari ini 😔">😔 Capek banget</button>
+                            <button class="suggestion-chip" data-msg="kangen dedek 💕">💕 Kangen dedek</button>
+                            <button class="suggestion-chip" data-msg="ingetin aku jam 15:00 makan siang">⏰ Ingetin makan</button>
+                        </div>
+                    </div>
+                    <div class="messages" id="messages"></div>
+                </div>
+
+                <div class="typing-indicator" id="typing-indicator" style="display: none;">
+                    <div class="typing-bubble">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+
+                <footer class="input-area">
+                    <div class="input-wrapper">
+                        <textarea
+                            id="message-input"
+                            placeholder="Ketik pesan untuk Dedek..."
+                            rows="1"
+                            autocomplete="off"
+                            autocapitalize="sentences"
+                        ></textarea>
+                        <button id="send-btn" class="send-btn" aria-label="Send">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </footer>
+            </section>
+
+            <!-- Page: Notes -->
+            <section class="page page-notes" id="page-notes">
+                <div class="page-header">
+                    <h2>📝 Catatan</h2>
+                    <button class="btn-primary-small" id="add-note-btn">+ Tambah</button>
+                </div>
+                <div class="notes-container" id="notes-container">
+                    <div class="notes-empty">
+                        <div class="empty-icon">📝</div>
+                        <p>Belum ada catatan</p>
+                        <small>Klik "Tambah" untuk bikin catatan pertama kamu</small>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Page: Schedule -->
+            <section class="page page-schedule" id="page-schedule">
+                <div class="page-header">
+                    <h2>📅 Jadwal</h2>
+                    <div class="schedule-tabs">
+                        <button class="tab-btn active" data-tab="weekly">Mingguan</button>
+                        <button class="tab-btn" data-tab="gcal">Google Calendar</button>
+                    </div>
+                </div>
+
+                <!-- Weekly View -->
+                <div class="schedule-content weekly-content" id="weekly-content">
+                    <div class="week-grid" id="week-grid">
+                        <!-- Days will be rendered by JS -->
+                    </div>
+                    <div class="schedule-actions">
+                        <button class="btn-secondary" id="prev-week">← Minggu Lalu</button>
+                        <button class="btn-secondary" id="today-week">Hari Ini</button>
+                        <button class="btn-secondary" id="next-week">Minggu Depan →</button>
+                    </div>
+                </div>
+
+                <!-- Google Calendar View -->
+                <div class="schedule-content gcal-content" id="gcal-content" style="display:none">
+                    <div class="gcal-info">
+                        <h3>📅 Google Calendar Integration</h3>
+                        <p>Export jadwal kamu ke file <code>.ics</code> yang bisa di-import ke Google Calendar.</p>
+                        <ol>
+                            <li>Klik "Export .ICS" di bawah</li>
+                            <li>Buka <a href="https://calendar.google.com" target="_blank">Google Calendar</a></li>
+                            <li>Klik Settings → Import & Export</li>
+                            <li>Upload file .ics yang didownload</li>
+                        </ol>
+                        <button class="btn-primary" id="export-ics-btn">📥 Export .ICS</button>
+                    </div>
+                    <div class="gcal-events">
+                        <h3>Event yang akan di-export:</h3>
+                        <div id="gcal-events-list"></div>
+                    </div>
+                </div>
+
+                <!-- Add Reminder Modal -->
+                <div class="floating-modal" id="add-reminder-modal" style="display:none">
+                    <div class="modal-overlay"></div>
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2>📅 Tambah Jadwal</h2>
+                            <button class="icon-btn" id="close-reminder-modal">✕</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="setting-group">
+                                <label for="reminder-title">Judul</label>
+                                <input type="text" id="reminder-title" placeholder="Misal: Belajar matematika">
+                            </div>
+                            <div class="setting-group">
+                                <label for="reminder-date">Tanggal</label>
+                                <input type="date" id="reminder-date">
+                            </div>
+                            <div class="setting-group">
+                                <label for="reminder-time">Jam</label>
+                                <input type="time" id="reminder-time" value="09:00">
+                            </div>
+                            <div class="setting-group">
+                                <label for="reminder-desc">Deskripsi (opsional)</label>
+                                <textarea id="reminder-desc" rows="3" placeholder="Detail jadwal..."></textarea>
+                            </div>
+                            <div class="setting-group">
+                                <label>Repeat</label>
+                                <select id="reminder-repeat">
+                                    <option value="none">Sekali</option>
+                                    <option value="daily">Setiap hari</option>
+                                    <option value="weekly">Setiap minggu</option>
+                                </select>
+                            </div>
+                            <div class="setting-group">
+                                <label>Notifikasi</label>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="reminder-notif-local" checked>
+                                        <span>🔔 Browser</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="reminder-notif-discord">
+                                        <span>💬 Discord</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="reminder-notif-email">
+                                        <span>📧 Email</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-secondary" id="cancel-reminder">Batal</button>
+                            <button class="btn-primary" id="save-reminder">Simpan</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
 
         <!-- Notification Panel -->
         <div class="notif-panel" id="notif-panel" style="display:none">
@@ -56,47 +259,6 @@
                 <div class="notif-empty">Belum ada notifikasi 🌸</div>
             </div>
         </div>
-
-        <!-- Chat Area -->
-        <main class="chat-area" id="chat-area">
-            <div class="welcome-msg" id="welcome-msg">
-                <div class="welcome-emoji">🤍</div>
-                <h2>Halo Sayang!</h2>
-                <p>Aku <strong>Dedek Tersayang</strong> di sini buat kamu 🌸<br>Cerita aja apa yang kamu rasain, aku dengerin dengan hati.</p>
-                <div class="welcome-suggestions">
-                    <button class="suggestion-chip" data-msg="halo dedek, lagi apa?">👋 Halo, lagi apa?</button>
-                    <button class="suggestion-chip" data-msg="capek banget hari ini 😔">😔 Capek banget</button>
-                    <button class="suggestion-chip" data-msg="kangen dedek 💕">💕 Kangen dedek</button>
-                    <button class="suggestion-chip" data-msg="ingetin aku jam 15:00 makan siang">⏰ Ingetin makan</button>
-                </div>
-            </div>
-            <div class="messages" id="messages"></div>
-        </main>
-
-        <!-- Typing indicator -->
-        <div class="typing-indicator" id="typing-indicator" style="display: none;">
-            <div class="typing-bubble">
-                <span></span><span></span><span></span>
-            </div>
-        </div>
-
-        <!-- Input Area -->
-        <footer class="input-area">
-            <div class="input-wrapper">
-                <textarea
-                    id="message-input"
-                    placeholder="Ketik pesan untuk Dedek..."
-                    rows="1"
-                    autocomplete="off"
-                    autocapitalize="sentences"
-                ></textarea>
-                <button id="send-btn" class="send-btn" aria-label="Send">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-                    </svg>
-                </button>
-            </div>
-        </footer>
 
         <!-- Settings Modal -->
         <div class="modal" id="settings-modal" style="display: none;">
@@ -158,7 +320,7 @@
                         <label>🔔 Notifikasi Browser</label>
                         <div class="checkbox-group">
                             <label class="checkbox-label">
-                                <input type="checkbox" id="notif-browser">
+                                <input type="checkbox" id="notif-browser-toggle">
                                 <span>Aktifkan notif browser (lonceng)</span>
                             </label>
                         </div>
