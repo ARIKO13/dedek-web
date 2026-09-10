@@ -570,6 +570,219 @@ html, body {
     border-top: 1px solid var(--border);
 }
 
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.notif-btn {
+    position: relative;
+}
+
+.notif-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: var(--accent);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    padding: 0 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-secondary);
+    box-shadow: 0 0 8px rgba(233, 30, 99, 0.6);
+    animation: badgePop 0.3s ease-out;
+}
+
+@keyframes badgePop {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* ============ Notification Panel ============ */
+.notif-panel {
+    position: fixed;
+    top: var(--header-height);
+    right: 0;
+    width: 100%;
+    max-width: 400px;
+    height: calc(100vh - var(--header-height));
+    height: calc(100dvh - var(--header-height));
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.3);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+.notif-panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.notif-panel-header h3 {
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.notif-panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-text {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.btn-text:hover {
+    background: var(--accent-light);
+}
+
+.notif-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.notif-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.notif-item {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.notif-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.notif-item.unread {
+    background: linear-gradient(90deg, var(--accent-light) 0%, transparent 100%);
+}
+
+.notif-item.unread::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+}
+
+.notif-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.notif-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.notif-body {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
+.notif-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* ============ Sound Options ============ */
+.sound-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.sound-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.sound-preset {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.sound-preset:hover {
+    border-color: var(--accent);
+}
+
+.sound-preset.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.sound-custom {
+    display: flex;
+    gap: 6px;
+}
+
+.sound-custom .btn-secondary {
+    flex: 1;
+}
+
 /* ============ Photo Upload ============ */
 .photo-upload-wrapper {
     display: flex;

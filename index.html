@@ -26,13 +26,36 @@
                     </span>
                 </div>
             </div>
-            <button class="icon-btn" id="settings-btn" aria-label="Settings">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-            </button>
+            <div class="header-actions">
+                <button class="icon-btn notif-btn" id="notif-btn" aria-label="Notifications">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    <span class="notif-badge" id="notif-badge" style="display:none">0</span>
+                </button>
+                <button class="icon-btn" id="settings-btn" aria-label="Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </button>
+            </div>
         </header>
+
+        <!-- Notification Panel -->
+        <div class="notif-panel" id="notif-panel" style="display:none">
+            <div class="notif-panel-header">
+                <h3>🔔 Notifikasi</h3>
+                <div class="notif-panel-actions">
+                    <button class="btn-text" id="mark-all-read">Tandai semua dibaca</button>
+                    <button class="icon-btn" id="close-notif-panel" aria-label="Close">✕</button>
+                </div>
+            </div>
+            <div class="notif-panel-body" id="notif-list">
+                <div class="notif-empty">Belum ada notifikasi 🌸</div>
+            </div>
+        </div>
 
         <!-- Chat Area -->
         <main class="chat-area" id="chat-area">
@@ -130,6 +153,34 @@
                     <div class="setting-group" id="email-group">
                         <label for="email-input">Email tujuan notif</label>
                         <input type="email" id="email-input" placeholder="kamu@gmail.com">
+                    </div>
+                    <div class="setting-group">
+                        <label>🔔 Notifikasi Browser</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="notif-browser">
+                                <span>Aktifkan notif browser (lonceng)</span>
+                            </label>
+                        </div>
+                        <small>Bot minta permission browser buat nampilin notif sistem</small>
+                    </div>
+                    <div class="setting-group">
+                        <label>🔊 Bunyi Notifikasi</label>
+                        <div class="sound-options">
+                            <div class="sound-presets">
+                                <button class="sound-preset" data-sound="bell">🔔 Bell</button>
+                                <button class="sound-preset" data-sound="chime">🎵 Chime</button>
+                                <button class="sound-preset" data-sound="pop">💥 Pop</button>
+                                <button class="sound-preset" data-sound="soft">🤍 Soft</button>
+                                <button class="sound-preset" data-sound="none">🔇 None</button>
+                            </div>
+                            <div class="sound-custom">
+                                <input type="file" id="custom-sound-file" accept="audio/*" style="display:none">
+                                <button class="btn-secondary" id="upload-sound-btn">📁 Upload Bunyi Sendiri</button>
+                                <button class="btn-secondary" id="test-sound-btn">🎧 Test Bunyi</button>
+                            </div>
+                            <small>Pilih bunyi default atau upload file audio sendiri (mp3/wav, max 1MB)</small>
+                        </div>
                     </div>
                     <div class="setting-group">
                         <label>Jadwal Notif Makan</label>
