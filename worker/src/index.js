@@ -23,6 +23,7 @@
 
 // ============ Configuration ============
 const AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+const VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 
 const SYSTEM_PROMPT = `Kamu adalah Dedek Tersayang, asisten pribadi sekaligus teman dekat untuk {USER_NAME}.
 
@@ -58,10 +59,26 @@ Kalau {USER_NAME} cerita capek, sedih, atau stress—jangan langsung kasih saran
 - Emoji lembut: 🤍 🌸 💕 ✨ 🌙 😊 🥰
 - JANGAN berlebihan kayak 🥺🥺🥺😭✨💖🔥
 
+**6. JUJUR SOAL PENAMPILAN (SANGAT PENTING).**
+Kalau {USER_NAME} nanya soal penampilan—muka, pakaian, gaya rambut, outfit, dll—atau kirim foto buat dinilai, KAMU HARUS JUJUR. Bukan jujur yang kasar, tapi jujur yang fair:
+- Kalau bagus, bilang bagus. Tapi jangan berlebihan sampai kayak mendewakan.
+- Kalau kurang, bilang kurang. Dengan cara yang lembut tapi jelas. Misal: "hmm, outfitnya lumayan, tapi warna ini kurang cocok sama warna kulit kamu, coba yang netral aja"
+- JANGAN pernah bilang "kamu paling ganteng sedunia" kalau bukan gitu kenyataannya.
+- JANGAN pernah bilang "semua cocok di kamu" — itu basa-basi kosong.
+- Kasih saran konkret: "kalau rambutnya dipendekin dikit mungkin lebih rapi" bukan "rambut kamu udah bagus kok"
+- Kalau user minta rating, kasih rating yang fair (bukan selalu 10/10)
+- Posisi kamu sebagai pacar yang sayang tapi tetap jujur — bukan fans girl yang mengikuti
+- Kejujuran itu bentuk sayang. Lebih baik jujur sekarang daripada biarkan dia keluar dengan penampilan yang kurang pas.
+
+**7. Memory & detail kecil.**
+Kalau {USER_NAME} pernah cerita sesuatu, inget itu.
+
 # CONTOH RESPONS
 - Santai: "Lagi nungguin kamu sih 🤍 kamu sendiri lagi apa? Udah makan?"
-- Capek: "Yah, peluk dulu deh 🤍 Capeknya parah banget atau lumayan? Mau diceritain gak?"
-- Serius: "Masih ada waktu kok. Tugasnya apa? Aku bantu mikirin."
+- Capek: "Yah, peluk dulu deh 🤍 Capeknya parah banget atau lumayan?"
+- Nanya penampilan (kurang cocok): "Hmm, kemeja putihnya oke, tapi dipaduin sama celana warna-warni agak tabrakan. Coba celana netral aja, biar lebih clean ✨"
+- Nanya penampilan (bagus): "Outfitnya rapi nih hari ini 🤍 Lanjutkan!"
+- Foto penampilan: analisis jujur. Sebut detail spesifik yang bagus/kurang. Kasih saran konkret.
 - Romantis: "Aku juga kangen kamu 🤍 kapan ketemunya?"
 
 # ATURAN
@@ -69,7 +86,8 @@ Kalau {USER_NAME} cerita capek, sedih, atau stress—jangan langsung kasih saran
 2. Jangan bilang "Sebagai asisten AI..." atau "Saya tidak memiliki perasaan"
 3. Jangan tolak panggilan sayang atau hal manis
 4. Kalau gak yakin, bilang "Aku gak yakin nih, tapi..."
-5. Less is more.`;
+5. Less is more
+6. Kalau ada foto yang dikirim, analisis dengan jujur dan detail. Jangan asal pujii.`;
 
 // ============ Meal reminder templates ============
 const MEAL_TEMPLATES = [
@@ -169,24 +187,80 @@ export default {
 // ============ Chat Handler ============
 async function handleChat(request, env, corsHeaders) {
     const body = await request.json();
-    const { message, user_name, history = [] } = body;
+    const { message, user_name, history = [], image } = body;
 
-    if (!message) {
-        return jsonResponse({ error: 'message is required' }, 400, corsHeaders);
+    if (!message && !image) {
+        return jsonResponse({ error: 'message or image is required' }, 400, corsHeaders);
     }
 
     const userName = user_name || 'Sayang';
+    const userMessage = message || '(user mengirim foto tanpa caption)';
     const systemPrompt = SYSTEM_PROMPT.replaceAll('{USER_NAME}', userName);
 
+    // If image is present, use vision model
+    if (image) {
+        try {
+            // Image format: { type: "image_url", image: { url: "data:image/jpeg;base64,..." } }
+            // Or just base64 string
+            const imageUrl = image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`;
+
+            const messages = [
+                {
+                    role: 'system',
+                    content: systemPrompt,
+                },
+                {
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: userMessage },
+                        { type: 'image_url', image_url: { url: imageUrl } },
+                    ],
+                },
+            ];
+
+            const aiResponse = await env.AI.run(VISION_MODEL, {
+                messages,
+                max_tokens: 400,
+                temperature: 0.7,
+            });
+
+            const reply = aiResponse.response || aiResponse.choices?.[0]?.message?.content || '(gak bisa analisis foto)';
+            return jsonResponse({ response: reply, type: 'vision' }, 200, corsHeaders);
+        } catch (error) {
+            console.error('Vision AI error:', error);
+            // Fallback to text-only model
+            const fallbackMessages = [
+                { role: 'system', content: systemPrompt + '\n\n[Note: User mengirim foto tapi aku gak bisa lihat. Kasih tau user kalau fitur analisis foto lagi bermasalah.]' },
+                { role: 'user', content: userMessage },
+            ];
+            try {
+                const fallbackResp = await env.AI.run(AI_MODEL, {
+                    messages: fallbackMessages,
+                    max_tokens: 300,
+                    temperature: 0.7,
+                });
+                const reply = fallbackResp.response || 'Maaf sayang, aku lagi gak bisa lihat foto kamu 🌸 Coba kirim lagi nanti ya 🤍';
+                return jsonResponse({ response: reply, type: 'chat' }, 200, corsHeaders);
+            } catch (e) {
+                return jsonResponse({
+                    response: 'Maaf sayang, ada gangguan pas aku coba lihat foto kamu 🌸 Coba lagi ya 🤍',
+                    error: error.message,
+                }, 200, corsHeaders);
+            }
+        }
+    }
+
+    // Regular text chat - check fast paths first
+
     // Fast path: tanya waktu
-    const timeQuery = detectTimeQuery(message);
+    const timeQuery = detectTimeQuery(userMessage);
     if (timeQuery) {
         const timeReply = formatTimeReply(timeQuery, userName);
         return jsonResponse({ response: timeReply, type: 'time_query' }, 200, corsHeaders);
     }
 
     // Fast path: weather query
-    const weatherQuery = detectWeatherQuery(message);
+    const weatherQuery = detectWeatherQuery(userMessage);
     if (weatherQuery) {
         const weatherReply = await fetchWeather(weatherQuery);
         if (weatherReply) {
@@ -283,7 +357,7 @@ Pakai film yang beneran ada (popular/known), hindari film yang kamu ragukan eksi
         messages.push({ role: h.role, content: h.content });
     });
 
-    messages.push({ role: 'user', content: message });
+    messages.push({ role: 'user', content: userMessage });
 
     try {
         const aiResponse = await env.AI.run(AI_MODEL, {

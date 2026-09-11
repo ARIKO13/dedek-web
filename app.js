@@ -28,8 +28,9 @@ let settings = { ...DEFAULT_SETTINGS };
 let messages = [];
 let notifications = [];
 let isTyping = false;
-let scheduledMealTimers = [];  // Active setTimeout IDs for meal reminders
-let audioContext = null;  // For Web Audio API sound generation
+let scheduledMealTimers = [];
+let audioContext = null;
+let pendingImage = null;  // base64 image yang belum dikirim
 
 // DOM elements
 const chatArea = document.getElementById('chat-area');
@@ -411,20 +412,38 @@ function renderMessages() {
     welcomeMsg.style.display = 'none';
 
     messages.forEach(msg => {
-        addMessageToDOM(msg.text, msg.role, msg.timestamp, false);
+        addMessageToDOM(msg.text, msg.role, msg.timestamp, false, msg.image);
     });
 
     scrollToBottom();
 }
 
-function addMessageToDOM(text, role, timestamp, animate = true) {
+function addMessageToDOM(text, role, timestamp, animate = true, image = null) {
     const msgEl = document.createElement('div');
     msgEl.className = `message ${role}`;
     if (!animate) msgEl.style.animation = 'none';
 
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
-    bubble.textContent = text;
+
+    // Add image if present
+    if (image) {
+        const img = document.createElement('img');
+        img.className = 'message-image';
+        img.src = image;
+        img.alt = 'Shared image';
+        img.addEventListener('click', () => {
+            window.open(image, '_blank');
+        });
+        bubble.appendChild(img);
+    }
+
+    // Add text
+    if (text) {
+        const textEl = document.createElement('div');
+        textEl.textContent = text;
+        bubble.appendChild(textEl);
+    }
 
     const time = document.createElement('div');
     time.className = 'message-time';
@@ -457,45 +476,48 @@ function formatTime(timestamp) {
 // ============ Send Message ============
 async function sendMessage(text) {
     text = text.trim();
-    if (!text || isTyping) return;
+    if (!text && !pendingImage) return;
+    if (isTyping) return;
 
     // Hide welcome
     welcomeMsg.style.display = 'none';
 
-    // Add user message
+    // Add user message (with image if present)
     const userMsg = {
-        text,
+        text: text || '(foto)',
         role: 'user',
         timestamp: Date.now(),
+        image: pendingImage || null,
     };
     messages.push(userMsg);
-    addMessageToDOM(text, 'user', userMsg.timestamp);
+    addMessageToDOM(text || '(foto)', 'user', userMsg.timestamp, true, pendingImage);
     saveMessages();
 
-    // Clear input
+    // Clear input & image
     messageInput.value = '';
     autoResize();
+    clearImagePreview();
 
     // Show typing
     showTyping();
 
     try {
-        // Check if it's a note command (auto-route to Notes page)
+        // Check if it's a note command
         const noteContent = detectNoteCommand(text);
         if (noteContent) {
             await handleNoteFromChat(noteContent);
             return;
         }
 
-        // Check if it's a reminder request (auto-route to Schedule page)
+        // Check if it's a reminder request
         const reminderMatch = parseReminder(text);
         if (reminderMatch) {
             await handleReminder(reminderMatch);
             return;
         }
 
-        // Regular chat - call Worker
-        const response = await callWorker(text);
+        // Regular chat - call Worker (with image if present)
+        const response = await callWorker(text, pendingImage);
         hideTyping();
 
         const botMsg = {
@@ -520,22 +542,28 @@ async function sendMessage(text) {
 }
 
 // ============ Cloudflare Worker API ============
-async function callWorker(userMessage) {
+async function callWorker(userMessage, imageData = null) {
     if (!settings.workerUrl) {
         return 'Sayang, aku belum terhubung ke server 🌸\nBuka pengaturan (ikon gear di kanan atas) lalu isi Worker URL. Kalau belum punya, ketik "lanjut" di chat aku bantu setup ya 🤍';
+    }
+
+    const body = {
+        message: userMessage,
+        user_name: settings.userName,
+        history: messages.slice(-10).map(m => ({
+            role: m.role === 'user' ? 'user' : 'assistant',
+            content: m.text,
+        })),
+    };
+
+    if (imageData) {
+        body.image = imageData;
     }
 
     const response = await fetch(`${settings.workerUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            message: userMessage,
-            user_name: settings.userName,
-            history: messages.slice(-10).map(m => ({
-                role: m.role === 'user' ? 'user' : 'assistant',
-                content: m.text,
-            })),
-        }),
+        body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -1191,6 +1219,46 @@ function clearChat() {
     showBadge('🗑️ Chat history dihapus');
 }
 
+// ============ Image Upload Handler ============
+function handleImageUpload(file) {
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        showBadge('❌ File harus gambar');
+        return;
+    }
+
+    // Max 4MB (Cloudflare Workers AI limit)
+    if (file.size > 4 * 1024 * 1024) {
+        showBadge('❌ Ukuran foto max 4MB');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        pendingImage = e.target.result;
+        // Show preview
+        const previewBar = document.getElementById('image-preview-bar');
+        const previewImg = document.getElementById('image-preview-img');
+        previewImg.src = pendingImage;
+        previewBar.style.display = 'flex';
+
+        // Focus text input so user can add caption
+        messageInput.focus();
+    };
+    reader.onerror = () => {
+        showBadge('❌ Gagal baca file gambar');
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearImagePreview() {
+    pendingImage = null;
+    document.getElementById('image-preview-bar').style.display = 'none';
+    document.getElementById('image-preview-img').src = '';
+    document.getElementById('image-input').value = '';
+}
+
 // ============ Event Listeners ============
 function setupEventListeners() {
     // Send button
@@ -1208,6 +1276,36 @@ function setupEventListeners() {
 
     // Auto-resize
     messageInput.addEventListener('input', autoResize);
+
+    // Image upload
+    document.getElementById('upload-image-btn').addEventListener('click', () => {
+        document.getElementById('image-input').click();
+    });
+
+    document.getElementById('image-input').addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleImageUpload(e.target.files[0]);
+            e.target.value = '';
+        }
+    });
+
+    document.getElementById('remove-image-btn').addEventListener('click', clearImagePreview);
+
+    // Paste image from clipboard
+    document.addEventListener('paste', (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (file) {
+                    handleImageUpload(file);
+                    e.preventDefault();
+                    break;
+                }
+            }
+        }
+    });
 
     // Settings
     settingsBtn.addEventListener('click', openSettings);

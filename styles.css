@@ -444,8 +444,78 @@ html, body {
     background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: 24px;
-    padding: 6px 6px 6px 16px;
+    padding: 6px 6px 6px 6px;
     transition: border-color 0.2s;
+    flex-wrap: wrap;
+}
+
+.upload-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.upload-btn:hover {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+
+.upload-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.image-preview-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    margin-bottom: 4px;
+}
+
+.image-preview-bar img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.remove-image-btn {
+    background: var(--danger);
+    border: none;
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.message-image {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 12px;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.message-bubble .message-image {
+    border: 2px solid rgba(255,255,255,0.1);
 }
 
 .input-wrapper:focus-within {

@@ -114,6 +114,18 @@
 
                 <footer class="input-area">
                     <div class="input-wrapper">
+                        <button class="upload-btn" id="upload-image-btn" aria-label="Upload image">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                        </button>
+                        <input type="file" id="image-input" accept="image/*" style="display:none">
+                        <div class="image-preview-bar" id="image-preview-bar" style="display:none">
+                            <img id="image-preview-img" alt="preview">
+                            <button class="remove-image-btn" id="remove-image-btn">✕</button>
+                        </div>
                         <textarea
                             id="message-input"
                             placeholder="Ketik pesan untuk Dedek..."
