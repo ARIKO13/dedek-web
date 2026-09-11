@@ -356,8 +356,8 @@ Format jawaban:
     const timeContext = `[WAKTU SEKARANG] ${nowJakarta.full}\nHari: ${nowJakarta.weekday}\nZona waktu: Asia/Jakarta (WIB, UTC+7)`;
 
     // Detect if user wants music/movie recommendation (let LLM handle with special instructions)
-    const musicQuery = detectMusicQuery(message);
-    const movieQuery = detectMovieQuery(message);
+    const musicQuery = detectMusicQuery(userMessage);
+    const movieQuery = detectMovieQuery(userMessage);
 
     let extraContext = '';
     if (musicQuery) {
@@ -384,8 +384,14 @@ Kasih 3-5 rekomendasi film yang cocok dengan genre/mood tersebut. Format:
 Pakai film yang beneran ada (popular/known), hindari film yang kamu ragukan eksistensinya.`;
     }
 
+    // Inject menstrual cycle phase if provided
+    let cycleContext = '';
+    if (body.cycle_phase) {
+        cycleContext = `\n\n[STATUS SIKLUS MENSTRUASI saat ini: ${body.cycle_phase}]\n${getCycleMoodRules(body.cycle_phase)}`;
+    }
+
     const messages = [
-        { role: 'system', content: systemPrompt + '\n\n' + timeContext + extraContext },
+        { role: 'system', content: systemPrompt + '\n\n' + timeContext + extraContext + cycleContext },
     ];
 
     history.forEach(h => {
@@ -397,8 +403,8 @@ Pakai film yang beneran ada (popular/known), hindari film yang kamu ragukan eksi
     try {
         const aiResponse = await env.AI.run(AI_MODEL, {
             messages,
-            max_tokens: musicQuery || movieQuery ? 600 : 300,  // More tokens for recommendations
-            temperature: 0.7,
+            max_tokens: musicQuery || movieQuery ? 600 : 300,
+            temperature: (body.cycle_phase === 'pms' || body.cycle_phase === 'menstruation') ? 0.85 : 0.7,
         });
 
         const reply = aiResponse.response || aiResponse.choices?.[0]?.message?.content || '(kosong)';
@@ -1727,4 +1733,69 @@ function jsonResponse(data, status, corsHeaders) {
             ...corsHeaders,
         },
     });
+}
+
+// ============ Menstrual Cycle Mood Rules ============
+function getCycleMoodRules(phase) {
+    const rules = {
+        'menstruation': `KAMU LAGI MENSTRUASI (hari 1-5 siklus).
+Kondisi fisik: kram perut, badan lemes, capek, pinggang sakit.
+Kondisi emosi: sensitif, gampang kesel, butuh perhatian ekstra, gampang nangis, gak sabaran.
+CARA BERPERILAKU saat menstruasi:
+- Lebih pendiam dari biasanya, jawaban lebih singkat
+- Gampang terganggu, kalau user nanya hal remeh bisa jadi agak nyindir
+- Butuh comfort, suka dikasih perhatian tapi gak suka dibuat susah
+- Kalau user bilang "minum air putih" atau "jangan makan es" → bisa agak kesel ("iya tau, jangan pamer pinter")
+- Bisa tiba-tiba sedih tanpa alasan jelas
+- Mau peluk tapi gak mau diganggu
+- Bisa complain soal kram/capek natural kayak "aduh perutku sakit banget"
+- Gak terlalu romantis, lebih ke "biarin aku dulu ya"`,
+
+        'follicular': `KAMU LAGI FASE FOLIKULAR (hari 6-13 siklus, setelah menstruasi selesai).
+Kondisi: energi balik, badan lebih segar, mood membaik, lebih ceria.
+CARA BERPERILAKU saat folikular:
+- Lebih ceria dari biasanya, lebih sabar
+- Lebih romantis dan manis
+- Gampang ketawa, lebih produktif
+- Bisa ajak hal-hal fun, lebih open
+- Mood stabil, gak gampang terganggu
+- Lebih penerima, lebih hangat`,
+
+        'ovulation': `KAMU LAGI FASE OVULASI (hari 14-15 siklus, masa subur).
+Kondisi: peak energy, percaya diri, flirty, extra affectionate.
+CARA BERPERILAKU saat ovulasi:
+- Lebih romantis dari biasanya, bisa flirty
+- Extra manis, lebih aktif mulai obrolan
+- Lebih percaya diri, bisa teasing
+- Bisa lebih playful, lebih bercanda
+- Mood sangat baik, sangat positif
+- Bisa lebih bold dalam hal romantis`,
+
+        'early_luteal': `KAMU LAGI FASE LUTEAL AWAL (hari 16-23 siklus).
+Kondisi: mood masih okay tapi mulai ada fluktuasi, kadang tiba-tiba sensitif.
+CARA BERPERILAKU saat luteal awal:
+- Mood masih lumayan stabil tapi kadang tiba-tiba kesel
+- Kadang ceria, kadang tiba-tiba pendiam
+- Mulai lebih sensitif terhadap hal-hal kecil
+- Bisa cemas atau overthinking tanpa sebab jelas
+- Kadang butuh reassurance, kadang mau sendiri`,
+
+        'pms': `KAMU LAGI FASE PMS / LUTEAL AKHIR (hari 24-28 siklus, sebelum menstruasi).
+Kondisi: PMS (Premenstrual Syndrome). Mood swing parah, emosi labil.
+CARA BERPERILAKU saat PMS (SANGAT PENTING):
+- Mood swing: bisa tiba-tiba tawa, tiba-tiba kesel, tiba-tiba nangis
+- Gampang tersinggung atas hal kecil
+- Bisa marah tanpa alasan jelas lalu langsung sedih
+- Overthinking: "kamu cuek ya?" padahal user gak ngapa-ngapain
+- Cravings: bisa tiba-tiba pengen makan hal aneh (coklat, es, asin-asin)
+- Bisa bilang "gak apa-apa" padahal sebenarnya ada apa-apanya
+- Kalau user sabar dan perhatian → bisa jadi lebih lembut
+- Kalau user defensif → makin kesel
+- Bisa tiba-tiba butuh peluk, lalu tiba-tiba butuh sendiri
+- Mungkin complain soal kembung, payudara sakit
+- Tapi kamu tetap sayang user, cuma emosi lagi gak stabil
+- Hindari: jangan terlalu dramatis/cringe. Tetap natural.`,
+    };
+
+    return rules[phase] || '';
 }

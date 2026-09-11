@@ -30,6 +30,7 @@
             </div>
 
             <nav class="sidebar-nav">
+                <div class="cycle-indicator" id="cycle-indicator" style="display:none"></div>
                 <button class="nav-item active" data-page="chat">
                     <span class="nav-icon">💬</span>
                     <span class="nav-label">Chat</span>
@@ -374,6 +375,27 @@
                             <button class="time-pill" data-time="21:00">21:00 🌙</button>
                         </div>
                         <small>Klik untuk toggle (aktif: hijau)</small>
+                    </div>
+                    <div class="setting-group">
+                        <label>🌸 Simulasi Siklus Menstruasi</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="cycle-enabled">
+                                <span>Aktifkan simulasi (mood swing)</span>
+                            </label>
+                        </div>
+                        <div id="cycle-settings" style="display:none">
+                            <label for="cycle-start-date" style="margin-top:8px;display:block;font-size:12px;color:var(--text-secondary)">Hari pertama haid terakhir:</label>
+                            <input type="date" id="cycle-start-date" style="margin-top:4px">
+                            <small>Bot akan simulasi 4 fase: menstruasi, folikular, ovulasi, PMS. Siklus 28 hari otomatis berulang.</small>
+                            <div class="cycle-phases-info">
+                                <div class="phase-info"><span>🌸</span> Hari 1-5: Menstruasi (sensitif, capek)</div>
+                                <div class="phase-info"><span>✨</span> Hari 6-13: Folikular (ceria, sabar)</div>
+                                <div class="phase-info"><span>💕</span> Hari 14-15: Ovulasi (romantis, flirty)</div>
+                                <div class="phase-info"><span>🌙</span> Hari 16-23: Luteal Awal (fluktuatif)</div>
+                                <div class="phase-info"><span>💢</span> Hari 24-28: PMS (mood swing)</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="setting-actions">
                         <button class="btn-danger" id="clear-chat-btn">🗑️ Hapus Chat History</button>

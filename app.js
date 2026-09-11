@@ -19,8 +19,10 @@ const DEFAULT_SETTINGS = {
     email: '',
     mealTimes: ['12:00', '18:00', '21:00'],
     photoUrl: '',
-    soundType: 'bell',  // bell, chime, pop, soft, none, custom
-    customSoundUrl: '',  // base64 data URL
+    soundType: 'bell',
+    customSoundUrl: '',
+    cycleStartDate: '',  // ISO date string - hari pertama haid terakhir
+    cycleEnabled: false,  // enable/disable cycle simulation
 };
 
 // State
@@ -61,9 +63,10 @@ function init() {
     renderMessages();
     renderAvatar();
     renderNotifications();
+    renderCycleIndicator();
     setupEventListeners();
     setupServiceWorker();
-    scheduleMealReminders();  // Schedule local meal notifs
+    scheduleMealReminders();
     requestNotifPermission();
 }
 
@@ -541,6 +544,51 @@ async function sendMessage(text) {
     }
 }
 
+// ============ Menstrual Cycle Tracker ============
+const CYCLE_LENGTH = 28;  // Average menstrual cycle
+
+function getCyclePhase() {
+    if (!settings.cycleEnabled || !settings.cycleStartDate) return null;
+
+    const start = new Date(settings.cycleStartDate);
+    start.setHours(0, 0, 0, 0);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.floor((now - start) / 86400000);
+    const cycleDay = ((diffDays % CYCLE_LENGTH) + CYCLE_LENGTH) % CYCLE_LENGTH;  // 0-27
+
+    // Phases:
+    // Day 0-4 (1-5): Menstruation
+    // Day 5-12 (6-13): Follicular
+    // Day 13-14 (14-15): Ovulation
+    // Day 15-22 (16-23): Early Luteal
+    // Day 23-27 (24-28): PMS / Late Luteal
+
+    if (cycleDay <= 4) return { phase: 'menstruation', day: cycleDay + 1, label: '🌸 Menstruasi' };
+    if (cycleDay <= 12) return { phase: 'follicular', day: cycleDay + 1, label: '✨ Folikular' };
+    if (cycleDay <= 14) return { phase: 'ovulation', day: cycleDay + 1, label: '💕 Ovulasi' };
+    if (cycleDay <= 22) return { phase: 'early_luteal', day: cycleDay + 1, label: '🌙 Luteal Awal' };
+    return { phase: 'pms', day: cycleDay + 1, label: '💢 PMS' };
+}
+
+function renderCycleIndicator() {
+    const cycleInfo = getCyclePhase();
+    const indicator = document.getElementById('cycle-indicator');
+    if (!indicator) return;
+
+    if (!cycleInfo) {
+        indicator.style.display = 'none';
+        return;
+    }
+
+    indicator.style.display = 'flex';
+    indicator.innerHTML = `
+        <span class="cycle-emoji">${cycleInfo.label.split(' ')[0]}</span>
+        <span class="cycle-label">Hari ${cycleInfo.day} · ${cycleInfo.label.split(' ').slice(1).join(' ')}</span>
+    `;
+}
+
 // ============ Cloudflare Worker API ============
 async function callWorker(userMessage, imageData = null) {
     if (!settings.workerUrl) {
@@ -555,6 +603,12 @@ async function callWorker(userMessage, imageData = null) {
             content: m.text,
         })),
     };
+
+    // Inject menstrual cycle phase if enabled
+    const cycleInfo = getCyclePhase();
+    if (cycleInfo) {
+        body.cycle_phase = cycleInfo.phase;
+    }
 
     if (imageData) {
         body.image = imageData;
@@ -1024,6 +1078,11 @@ function openSettings() {
         p.classList.toggle('active', p.dataset.sound === settings.soundType);
     });
 
+    // Cycle settings
+    document.getElementById('cycle-enabled').checked = settings.cycleEnabled;
+    document.getElementById('cycle-start-date').value = settings.cycleStartDate || '';
+    document.getElementById('cycle-settings').style.display = settings.cycleEnabled ? 'block' : 'none';
+
     // Update meal time pills
     document.querySelectorAll('.time-pill').forEach(pill => {
         const time = pill.dataset.time;
@@ -1055,8 +1114,13 @@ function saveSettingsFromModal() {
     settings.mealTimes = Array.from(document.querySelectorAll('.time-pill.active'))
         .map(pill => pill.dataset.time);
 
+    // Cycle settings
+    settings.cycleEnabled = document.getElementById('cycle-enabled').checked;
+    settings.cycleStartDate = document.getElementById('cycle-start-date').value;
+
     saveSettingsToStorage();
     renderAvatar();
+    renderCycleIndicator();
     closeSettingsModal();
     showBadge('✅ Pengaturan tersimpan');
 
@@ -1535,6 +1599,17 @@ function setupEventListeners() {
     const cleanupBtn = document.getElementById('cleanup-past-btn');
     if (cleanupBtn) {
         cleanupBtn.addEventListener('click', cleanupPastReminders);
+    }
+
+    // Cycle settings toggle
+    const cycleEnabled = document.getElementById('cycle-enabled');
+    if (cycleEnabled) {
+        cycleEnabled.addEventListener('change', (e) => {
+            document.getElementById('cycle-settings').style.display = e.target.checked ? 'block' : 'none';
+            if (e.target.checked && !document.getElementById('cycle-start-date').value) {
+                document.getElementById('cycle-start-date').value = new Date().toISOString().split('T')[0];
+            }
+        });
     }
 }
 
