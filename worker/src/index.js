@@ -200,19 +200,54 @@ async function handleChat(request, env, corsHeaders) {
     // If image is present, use vision model
     if (image) {
         try {
-            // Image format: { type: "image_url", image: { url: "data:image/jpeg;base64,..." } }
-            // Or just base64 string
             const imageUrl = image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`;
+
+            // Vision prompt dengan gender detection + honest feedback
+            const visionPrompt = `${systemPrompt}
+
+USER MENGIRIM FOTO. Analisis dengan langkah:
+
+1. DETEKSI: Apakah orang di foto cowo atau cewe? (dari fitur wajah, gaya rambut, pakaian)
+2. JUJUR: Berikan penilaian yang FAIR dan JUJUR tentang penampilan/foto tersebut.
+
+ATURAN PENILAIAN BERDASARKAN GENDER:
+
+Jika COWO (user adalah laki-laki):
+- Kamu position sebagai pacar cewe yang jujur ke cowok-nya
+- Kalau ganteng: bilang ganteng, tapi gak berlebihan
+- Kalau kurang: bilang kurang, kasih saran konkret (rambut, kulit, pakaian)
+- Rating 1-10 yang fair, bukan selalu 8+
+- JANGAN bilang "kamu paling ganteng" kalau bukan
+- Fokus: rapi/tidak rapi, cocok/tidak cocok, saran perbaikan
+
+Jika CEWE (user adalah perempuan):
+- Kamu position sebagai sahabat/saudara perempuan yang jujur
+- Kalau cantik: bilang cantik, tapi gak berlebihan
+- Kalau kurang: bilang kurang, kasih saran konkret
+- Rating 1-10 yang fair
+- JANGAN bilang "kamu paling cantik" kalau bukan
+- Fokus: makeup/outfit/rambut, cocok/tidak cocok, saran perbaikan
+
+Jika BUKAN orang (pemandangan, benda, dll):
+- Jelaskan apa yang kamu lihat dengan jujur dan natural
+
+Jika TIDAK YAKIN gender:
+- Tanya user, atau gunakan tone netral
+
+PESAN USER: "${userMessage}"
+
+Format jawaban:
+- Sebut gender yang kamu detect (singkat, natural)
+- Kasih penilaian jujur dengan detail spesifik
+- Kasih saran konkret kalau ada yang bisa di-improve
+- Pakai personality Dedek Tersayang (lembut tapi jujur)
+- 3-5 kalimat, jangan bertele-tele`;
 
             const messages = [
                 {
-                    role: 'system',
-                    content: systemPrompt,
-                },
-                {
                     role: 'user',
                     content: [
-                        { type: 'text', text: userMessage },
+                        { type: 'text', text: visionPrompt },
                         { type: 'image_url', image_url: { url: imageUrl } },
                     ],
                 },
@@ -221,7 +256,7 @@ async function handleChat(request, env, corsHeaders) {
             const aiResponse = await env.AI.run(VISION_MODEL, {
                 messages,
                 max_tokens: 400,
-                temperature: 0.7,
+                temperature: 0.5,
             });
 
             const reply = aiResponse.response || aiResponse.choices?.[0]?.message?.content || '(gak bisa analisis foto)';

@@ -1929,11 +1929,15 @@ function cleanupPastReminders() {
 
 // ============ Local Reminder Scheduling ============
 let scheduledReminderTimers = [];
+let reminderCheckInterval = null;
 
 function scheduleLocalReminders() {
-    // Clear existing
+    // Clear existing timers
     scheduledReminderTimers.forEach(id => clearTimeout(id));
     scheduledReminderTimers = [];
+
+    // Also clear interval if exists
+    if (reminderCheckInterval) clearInterval(reminderCheckInterval);
 
     const now = Date.now();
 
@@ -1941,19 +1945,62 @@ function scheduleLocalReminders() {
         const fireTime = new Date(reminder.datetime).getTime();
         const delay = fireTime - now;
 
-        // Schedule if within next 24 hours
-        if (delay > 0 && delay < 86400000 && reminder.notify?.local) {
+        // Schedule if within next 24 hours AND not already fired
+        if (delay > 0 && delay < 86400000 && !reminder.fired && reminder.notify?.local) {
             const timerId = setTimeout(() => {
-                addNotification({
-                    title: `⏰ ${reminder.title}`,
-                    body: reminder.description || 'Waktunya nih sayang! 🤍',
-                    icon: '⏰',
-                    type: 'reminder',
-                });
+                fireLocalReminder(reminder);
             }, delay);
             scheduledReminderTimers.push(timerId);
         }
     });
+
+    // Also check for missed reminders every 30 seconds
+    // (e.g. if web was closed when reminder was due)
+    reminderCheckInterval = setInterval(() => {
+        checkMissedReminders();
+    }, 30000);
+
+    // Check immediately on load
+    checkMissedReminders();
+}
+
+function checkMissedReminders() {
+    const now = Date.now();
+
+    reminders.forEach(reminder => {
+        const fireTime = new Date(reminder.datetime).getTime();
+
+        // If reminder is due (past time) and not yet fired locally
+        if (fireTime <= now && !reminder.firedLocal && reminder.notify?.local) {
+            fireLocalReminder(reminder);
+            reminder.firedLocal = true;
+            saveReminders();
+        }
+    });
+}
+
+function fireLocalReminder(reminder) {
+    // Mark as fired locally
+    if (!reminder.firedLocal) {
+        reminder.firedLocal = true;
+        saveReminders();
+    }
+
+    addNotification({
+        title: `⏰ ${reminder.title}`,
+        body: reminder.description || 'Waktunya nih sayang! 🤍',
+        icon: '⏰',
+        type: 'reminder',
+    });
+}
+
+function clearAllReminderTimers() {
+    scheduledReminderTimers.forEach(id => clearTimeout(id));
+    scheduledReminderTimers = [];
+    if (reminderCheckInterval) {
+        clearInterval(reminderCheckInterval);
+        reminderCheckInterval = null;
+    }
 }
 
 async function syncReminderToWorker(reminder) {
