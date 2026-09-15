@@ -21,8 +21,10 @@ const DEFAULT_SETTINGS = {
     photoUrl: '',
     soundType: 'bell',
     customSoundUrl: '',
-    cycleStartDate: '',  // ISO date string - hari pertama haid terakhir
-    cycleEnabled: false,  // enable/disable cycle simulation
+    cycleStartDate: '',
+    cycleEnabled: false,
+    wallpaper: 'default',  // default | sunset | ocean | forest | lavender | peach | midnight | rose | custom
+    customWallpaper: '',  // base64 data URL for custom wallpaper
 };
 
 // State
@@ -64,6 +66,7 @@ function init() {
     renderAvatar();
     renderNotifications();
     renderCycleIndicator();
+    applyWallpaper();
     setupEventListeners();
     setupServiceWorker();
     scheduleMealReminders();
@@ -589,6 +592,55 @@ function renderCycleIndicator() {
     `;
 }
 
+// ============ Wallpaper ============
+const WALLPAPER_GRADIENTS = {
+    'default': '#0f0f23',
+    'sunset': 'linear-gradient(135deg, #ff6b6b, #feca57)',
+    'ocean': 'linear-gradient(135deg, #4834d4, #686de0)',
+    'forest': 'linear-gradient(135deg, #2d3436, #00b894)',
+    'lavender': 'linear-gradient(135deg, #6c5ce7, #a29bfe)',
+    'peach': 'linear-gradient(135deg, #fd79a8, #fdcb6e)',
+    'midnight': 'linear-gradient(135deg, #0c0c1d, #1a1a3e)',
+    'rose': 'linear-gradient(135deg, #e84393, #fd79a8)',
+};
+
+function applyWallpaper() {
+    const chatArea = document.getElementById('chat-area');
+    if (!chatArea) return;
+
+    if (settings.wallpaper === 'custom' && settings.customWallpaper) {
+        chatArea.style.background = `url('${settings.customWallpaper}') center/cover no-repeat fixed`;
+    } else if (WALLPAPER_GRADIENTS[settings.wallpaper]) {
+        chatArea.style.background = WALLPAPER_GRADIENTS[settings.wallpaper];
+    } else {
+        chatArea.style.background = WALLPAPER_GRADIENTS['default'];
+    }
+}
+
+function handleWallpaperUpload(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        showBadge('❌ File harus gambar');
+        return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+        showBadge('❌ Ukuran wallpaper max 3MB');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        settings.customWallpaper = e.target.result;
+        settings.wallpaper = 'custom';
+        saveSettingsToStorage();
+        applyWallpaper();
+        // Update UI
+        document.querySelectorAll('.wallpaper-preset').forEach(p => p.classList.remove('active'));
+        showBadge('✅ Wallpaper custom tersimpan');
+    };
+    reader.readAsDataURL(file);
+}
+
 // ============ Cloudflare Worker API ============
 async function callWorker(userMessage, imageData = null) {
     if (!settings.workerUrl) {
@@ -1083,6 +1135,11 @@ function openSettings() {
     document.getElementById('cycle-start-date').value = settings.cycleStartDate || '';
     document.getElementById('cycle-settings').style.display = settings.cycleEnabled ? 'block' : 'none';
 
+    // Wallpaper settings
+    document.querySelectorAll('.wallpaper-preset').forEach(p => {
+        p.classList.toggle('active', p.dataset.wallpaper === settings.wallpaper);
+    });
+
     // Update meal time pills
     document.querySelectorAll('.time-pill').forEach(pill => {
         const time = pill.dataset.time;
@@ -1121,6 +1178,7 @@ function saveSettingsFromModal() {
     saveSettingsToStorage();
     renderAvatar();
     renderCycleIndicator();
+    applyWallpaper();
     closeSettingsModal();
     showBadge('✅ Pengaturan tersimpan');
 
@@ -1611,6 +1669,40 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Wallpaper presets
+    document.querySelectorAll('.wallpaper-preset').forEach(preset => {
+        preset.addEventListener('click', () => {
+            document.querySelectorAll('.wallpaper-preset').forEach(p => p.classList.remove('active'));
+            preset.classList.add('active');
+            settings.wallpaper = preset.dataset.wallpaper;
+            saveSettingsToStorage();
+            applyWallpaper();
+        });
+    });
+
+    // Wallpaper upload
+    document.getElementById('upload-wallpaper-btn').addEventListener('click', () => {
+        document.getElementById('wallpaper-file').click();
+    });
+
+    document.getElementById('wallpaper-file').addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            handleWallpaperUpload(e.target.files[0]);
+            e.target.value = '';
+        }
+    });
+
+    // Wallpaper reset
+    document.getElementById('remove-wallpaper-btn').addEventListener('click', () => {
+        settings.wallpaper = 'default';
+        settings.customWallpaper = '';
+        saveSettingsToStorage();
+        applyWallpaper();
+        document.querySelectorAll('.wallpaper-preset').forEach(p => p.classList.remove('active'));
+        document.querySelector('.wallpaper-preset[data-wallpaper="default"]').classList.add('active');
+        showBadge('🗑️ Wallpaper direset ke default');
+    });
 }
 
 // ============ Service Worker (for PWA) ============

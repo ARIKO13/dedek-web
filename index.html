@@ -309,6 +309,27 @@
                         </div>
                     </div>
                     <div class="setting-group">
+                        <label>🖼️ Wallpaper Chat</label>
+                        <div class="wallpaper-options">
+                            <div class="wallpaper-presets">
+                                <button class="wallpaper-preset active" data-wallpaper="default" style="background:#0f0f23" title="Default">🖤</button>
+                                <button class="wallpaper-preset" data-wallpaper="sunset" style="background:linear-gradient(135deg,#ff6b6b,#feca57)" title="Sunset">🌅</button>
+                                <button class="wallpaper-preset" data-wallpaper="ocean" style="background:linear-gradient(135deg,#4834d4,#686de0)" title="Ocean">🌊</button>
+                                <button class="wallpaper-preset" data-wallpaper="forest" style="background:linear-gradient(135deg,#2d3436,#00b894)" title="Forest">🌲</button>
+                                <button class="wallpaper-preset" data-wallpaper="lavender" style="background:linear-gradient(135deg,#6c5ce7,#a29bfe)" title="Lavender">💜</button>
+                                <button class="wallpaper-preset" data-wallpaper="peach" style="background:linear-gradient(135deg,#fd79a8,#fdcb6e)" title="Peach">🍑</button>
+                                <button class="wallpaper-preset" data-wallpaper="midnight" style="background:linear-gradient(135deg,#0c0c1d,#1a1a3e)" title="Midnight">🌌</button>
+                                <button class="wallpaper-preset" data-wallpaper="rose" style="background:linear-gradient(135deg,#e84393,#fd79a8)" title="Rose">🌹</button>
+                            </div>
+                            <div class="wallpaper-custom">
+                                <input type="file" id="wallpaper-file" accept="image/*" style="display:none">
+                                <button class="btn-secondary" id="upload-wallpaper-btn">📁 Upload Wallpaper</button>
+                                <button class="btn-danger-small" id="remove-wallpaper-btn">🗑️ Reset</button>
+                            </div>
+                            <small>Pilih tema warna atau upload foto sendiri sebagai background chat</small>
+                        </div>
+                    </div>
+                    <div class="setting-group">
                         <label for="user-name-input">Nama kamu</label>
                         <input type="text" id="user-name-input" placeholder="Sayang">
                         <small>Bot akan panggil kamu dengan nama ini</small>
