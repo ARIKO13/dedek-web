@@ -23,8 +23,9 @@ const DEFAULT_SETTINGS = {
     customSoundUrl: '',
     cycleStartDate: '',
     cycleEnabled: false,
-    wallpaper: 'default',  // default | sunset | ocean | forest | lavender | peach | midnight | rose | custom
-    customWallpaper: '',  // base64 data URL for custom wallpaper
+    wallpaper: 'default',
+    customWallpaper: '',
+    wallpaperPosition: 'cover',  // cover, contain, repeat, center
 };
 
 // State
@@ -608,12 +609,52 @@ function applyWallpaper() {
     const chatArea = document.getElementById('chat-area');
     if (!chatArea) return;
 
+    const pos = settings.wallpaperPosition || 'cover';
+
     if (settings.wallpaper === 'custom' && settings.customWallpaper) {
-        chatArea.style.background = `url('${settings.customWallpaper}') center/cover no-repeat fixed`;
+        if (pos === 'repeat') {
+            chatArea.style.background = `url('${settings.customWallpaper}') repeat center`;
+        } else if (pos === 'center') {
+            chatArea.style.background = `url('${settings.customWallpaper}') no-repeat center / auto`;
+            chatArea.style.backgroundColor = '#0f0f23';
+        } else if (pos === 'contain') {
+            chatArea.style.background = `url('${settings.customWallpaper}') no-repeat center / contain`;
+            chatArea.style.backgroundColor = '#0f0f23';
+        } else {
+            chatArea.style.background = `url('${settings.customWallpaper}') no-repeat center / cover`;
+        }
     } else if (WALLPAPER_GRADIENTS[settings.wallpaper]) {
         chatArea.style.background = WALLPAPER_GRADIENTS[settings.wallpaper];
+        chatArea.style.backgroundColor = '';
     } else {
         chatArea.style.background = WALLPAPER_GRADIENTS['default'];
+        chatArea.style.backgroundColor = '';
+    }
+}
+
+function updateWallpaperPreview() {
+    const preview = document.getElementById('wallpaper-preview-area');
+    if (!preview) return;
+
+    const pos = settings.wallpaperPosition || 'cover';
+
+    if (settings.wallpaper === 'custom' && settings.customWallpaper) {
+        preview.classList.add('has-wallpaper');
+        if (pos === 'repeat') {
+            preview.style.background = `url('${settings.customWallpaper}') repeat center`;
+        } else if (pos === 'center') {
+            preview.style.background = `url('${settings.customWallpaper}') no-repeat center / auto, #0f0f23`;
+        } else if (pos === 'contain') {
+            preview.style.background = `url('${settings.customWallpaper}') no-repeat center / contain, #0f0f23`;
+        } else {
+            preview.style.background = `url('${settings.customWallpaper}') no-repeat center / cover`;
+        }
+    } else if (WALLPAPER_GRADIENTS[settings.wallpaper]) {
+        preview.classList.add('has-wallpaper');
+        preview.style.background = WALLPAPER_GRADIENTS[settings.wallpaper];
+    } else {
+        preview.classList.add('has-wallpaper');
+        preview.style.background = WALLPAPER_GRADIENTS['default'];
     }
 }
 
@@ -634,6 +675,7 @@ function handleWallpaperUpload(file) {
         settings.wallpaper = 'custom';
         saveSettingsToStorage();
         applyWallpaper();
+        updateWallpaperPreview();
         // Update UI
         document.querySelectorAll('.wallpaper-preset').forEach(p => p.classList.remove('active'));
         showBadge('✅ Wallpaper custom tersimpan');
@@ -1139,6 +1181,10 @@ function openSettings() {
     document.querySelectorAll('.wallpaper-preset').forEach(p => {
         p.classList.toggle('active', p.dataset.wallpaper === settings.wallpaper);
     });
+    document.querySelectorAll('.position-pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.position === (settings.wallpaperPosition || 'cover'));
+    });
+    updateWallpaperPreview();
 
     // Update meal time pills
     document.querySelectorAll('.time-pill').forEach(pill => {
@@ -1677,6 +1723,19 @@ function setupEventListeners() {
             preset.classList.add('active');
             settings.wallpaper = preset.dataset.wallpaper;
             saveSettingsToStorage();
+            updateWallpaperPreview();
+            applyWallpaper();
+        });
+    });
+
+    // Wallpaper position pills
+    document.querySelectorAll('.position-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            document.querySelectorAll('.position-pill').forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            settings.wallpaperPosition = pill.dataset.position;
+            saveSettingsToStorage();
+            updateWallpaperPreview();
             applyWallpaper();
         });
     });
@@ -1697,10 +1756,14 @@ function setupEventListeners() {
     document.getElementById('remove-wallpaper-btn').addEventListener('click', () => {
         settings.wallpaper = 'default';
         settings.customWallpaper = '';
+        settings.wallpaperPosition = 'cover';
         saveSettingsToStorage();
         applyWallpaper();
+        updateWallpaperPreview();
         document.querySelectorAll('.wallpaper-preset').forEach(p => p.classList.remove('active'));
         document.querySelector('.wallpaper-preset[data-wallpaper="default"]').classList.add('active');
+        document.querySelectorAll('.position-pill').forEach(p => p.classList.remove('active'));
+        document.querySelector('.position-pill[data-position="cover"]').classList.add('active');
         showBadge('🗑️ Wallpaper direset ke default');
     });
 }

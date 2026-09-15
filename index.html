@@ -311,6 +311,11 @@
                     <div class="setting-group">
                         <label>🖼️ Wallpaper Chat</label>
                         <div class="wallpaper-options">
+                            <div class="wallpaper-preview-box" id="wallpaper-preview-box">
+                                <div class="wallpaper-preview-area" id="wallpaper-preview-area">
+                                    <span class="wallpaper-preview-text">Preview</span>
+                                </div>
+                            </div>
                             <div class="wallpaper-presets">
                                 <button class="wallpaper-preset active" data-wallpaper="default" style="background:#0f0f23" title="Default">🖤</button>
                                 <button class="wallpaper-preset" data-wallpaper="sunset" style="background:linear-gradient(135deg,#ff6b6b,#feca57)" title="Sunset">🌅</button>
@@ -321,12 +326,21 @@
                                 <button class="wallpaper-preset" data-wallpaper="midnight" style="background:linear-gradient(135deg,#0c0c1d,#1a1a3e)" title="Midnight">🌌</button>
                                 <button class="wallpaper-preset" data-wallpaper="rose" style="background:linear-gradient(135deg,#e84393,#fd79a8)" title="Rose">🌹</button>
                             </div>
+                            <div class="wallpaper-position-group">
+                                <label style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;display:block">Posisi & Ukuran:</label>
+                                <div class="wallpaper-position-pills">
+                                    <button class="position-pill active" data-position="cover" title="Penuhi (crop)">📐 Cover</button>
+                                    <button class="position-pill" data-position="contain" title="Pas (full image)">🖼️ Fit</button>
+                                    <button class="position-pill" data-position="repeat" title="Ulangi">🔲 Tile</button>
+                                    <button class="position-pill" data-position="center" title="Tengah">🎯 Center</button>
+                                </div>
+                            </div>
                             <div class="wallpaper-custom">
                                 <input type="file" id="wallpaper-file" accept="image/*" style="display:none">
                                 <button class="btn-secondary" id="upload-wallpaper-btn">📁 Upload Wallpaper</button>
                                 <button class="btn-danger-small" id="remove-wallpaper-btn">🗑️ Reset</button>
                             </div>
-                            <small>Pilih tema warna atau upload foto sendiri sebagai background chat</small>
+                            <small>Pilih tema atau upload foto. Atur posisi sebelum simpan.</small>
                         </div>
                     </div>
                     <div class="setting-group">
